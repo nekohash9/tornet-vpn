@@ -81,7 +81,7 @@ class TorNetService : LifecycleService() {
                     if (intent.getStringExtra(TorService.EXTRA_STATUS) == TorService.STATUS_ON) onTorReady()
 
                 TorService.ACTION_ERROR ->
-                    TorNetStore.log("Ошибка Tor: ${intent.getStringExtra(Intent.EXTRA_TEXT)}")
+                    TorNetStore.log(L10n.s(R.string.log_tor_error, intent.getStringExtra(Intent.EXTRA_TEXT)))
             }
         }
     }
@@ -113,7 +113,7 @@ class TorNetService : LifecycleService() {
         val status = TorNetStore.state.value.status
         if (bound && settings.bridgeMode to settings.customBridges != appliedBridges) {
             // Поменяли способ подключения на ходу — переподключаемся без перезапуска Tor.
-            TorNetStore.log("Новый способ подключения: ${settings.bridgeMode.title}")
+            TorNetStore.log(L10n.s(R.string.log_new_method, settings.bridgeMode.title))
             rotationJob?.cancel()
             TorNetStore.update {
                 it.copy(status = TorStatus.STARTING, changes = 0, maxChanges = settings.count, nextChangeAt = 0)
@@ -129,7 +129,7 @@ class TorNetService : LifecycleService() {
         if (status == TorStatus.ON) {
             // Уже работаем — просто применяем новые настройки.
             TorNetStore.update { it.copy(changes = 0, maxChanges = settings.count) }
-            TorNetStore.log("Новые настройки: ${describe(settings)}")
+            TorNetStore.log(L10n.s(R.string.log_new_settings, describe(settings)))
             syncVpn()
             lifecycleScope.launch { syncLan() }
             startRotation()
@@ -139,7 +139,7 @@ class TorNetService : LifecycleService() {
 
         TorNetStore.reset()
         TorNetStore.update { it.copy(status = TorStatus.STARTING, maxChanges = settings.count) }
-        TorNetStore.log("Запуск Tor… (${describe(settings)})")
+        TorNetStore.log(L10n.s(R.string.log_starting, describe(settings)))
 
         val filter = IntentFilter().apply {
             addAction(TorService.ACTION_STATUS)
@@ -154,7 +154,7 @@ class TorNetService : LifecycleService() {
             if (!nextAttempt(firstStart = true)) return@launch
             bound = bindService(Intent(this@TorNetService, TorService::class.java), connection, Context.BIND_AUTO_CREATE)
             if (!bound) {
-                TorNetStore.log("Не удалось запустить TorService")
+                TorNetStore.log(L10n.s(R.string.log_torservice_failed))
                 stop()
                 return@launch
             }
@@ -188,16 +188,16 @@ class TorNetService : LifecycleService() {
         BridgeMode.AUTO -> null
         BridgeMode.DIRECT -> emptyList()
         BridgeMode.CUSTOM -> BridgeLine.parse(settings.customBridges).ifEmpty {
-            TorNetStore.log("Свои мосты не заданы")
+            TorNetStore.log(L10n.s(R.string.log_no_custom))
             null
         }
         BridgeMode.MOAT -> {
-            TorNetStore.log("Запрашиваю мосты у Tor Project (Moat)…")
+            TorNetStore.log(L10n.s(R.string.log_moat_request))
             val fresh = withContext(Dispatchers.IO) { runCatching { Moat.fetchBridges(this@TorNetService) } }
             fresh.onSuccess {
                 if (it.isNotEmpty()) RotationSettings.setMoatBridges(this, it)
-                TorNetStore.log("Moat выдал мостов: ${it.size}")
-            }.onFailure { TorNetStore.log("Moat недоступен: ${it.message}") }
+                TorNetStore.log(L10n.s(R.string.log_moat_got, it.size))
+            }.onFailure { TorNetStore.log(L10n.s(R.string.log_moat_failed, it.message)) }
             (fresh.getOrNull()?.takeIf { it.isNotEmpty() } ?: RotationSettings.moatBridges(this)).ifEmpty { null }
         }
         else -> BuiltInBridges.get(this, mode).ifEmpty { null }
@@ -211,7 +211,7 @@ class TorNetService : LifecycleService() {
         repeat(32) {
             if (attempts.isEmpty()) {
                 if (settings.bridgeMode != BridgeMode.AUTO) return false
-                TorNetStore.log("Ни один способ пока не сработал, пробую по второму кругу")
+                TorNetStore.log(L10n.s(R.string.log_next_round))
                 resetAttempts()
             }
             val mode = attempts.removeFirst()
@@ -219,7 +219,7 @@ class TorNetService : LifecycleService() {
             val config = withContext(Dispatchers.IO) {
                 runCatching { PluggableTransports.torConfig(this@TorNetService, bridges) }
             }.getOrElse {
-                TorNetStore.log("${mode.title}: не удалось запустить транспорт: ${it.message}")
+                TorNetStore.log(L10n.s(R.string.log_transport_start_failed, mode.title, it.message))
                 return@repeat
             }
             val applied = if (firstStart) {
@@ -236,8 +236,10 @@ class TorNetService : LifecycleService() {
             stallSince = System.currentTimeMillis()
             stallHinted = false
             TorNetStore.update { it.copy(transport = mode.title) }
-            val count = if (bridges.isEmpty()) "" else " (мостов: ${bridges.size})"
-            TorNetStore.log("Подключаюсь: ${mode.title}$count")
+            TorNetStore.log(
+                if (bridges.isEmpty()) L10n.s(R.string.log_connecting, mode.title)
+                else L10n.s(R.string.log_connecting_bridges, mode.title, bridges.size)
+            )
             return true
         }
         return false
@@ -251,7 +253,7 @@ class TorNetService : LifecycleService() {
             control.resetConf(listOf("UseBridges", "Bridge", "ClientTransportPlugin"))
             control.setConf(config)
             control.setConf("DisableNetwork", "0")
-        }.onFailure { TorNetStore.log("Не удалось применить мосты: ${it.message}") }.isSuccess
+        }.onFailure { TorNetStore.log(L10n.s(R.string.log_bridges_apply_failed, it.message)) }.isSuccess
     }
 
     /** Нет прогресса дольше таймаута — в «Авто» переходим к следующему способу. */
@@ -266,7 +268,7 @@ class TorNetService : LifecycleService() {
         if (now - stallSince < currentMode.stallSeconds * 1000L) return
 
         if (settings.bridgeMode == BridgeMode.AUTO) {
-            TorNetStore.log("${currentMode.title}: нет прогресса ${currentMode.stallSeconds} с, пробую дальше")
+            TorNetStore.log(L10n.s(R.string.log_stall_next, currentMode.title, currentMode.stallSeconds))
             switching = true
             try {
                 nextAttempt(firstStart = false)
@@ -275,7 +277,7 @@ class TorNetService : LifecycleService() {
             }
         } else if (!stallHinted) {
             stallHinted = true
-            TorNetStore.log("${currentMode.title}: подключение застряло. Попробуйте режим «Авто» или другие мосты")
+            TorNetStore.log(L10n.s(R.string.log_stall_hint, currentMode.title))
         }
     }
 
@@ -291,7 +293,7 @@ class TorNetService : LifecycleService() {
                 val summary = Regex("SUMMARY=\"([^\"]*)\"").find(phase)?.groupValues?.get(1).orEmpty()
                 TorNetStore.update { it.copy(bootstrap = progress, bootstrapSummary = summary) }
                 if (progress / 25 != lastLogged / 25) {
-                    TorNetStore.log("Подключение: $progress% $summary")
+                    TorNetStore.log(L10n.s(R.string.log_bootstrap, progress, summary))
                     lastLogged = progress
                 }
                 if (progress >= 100) onTorReady() else checkStall(progress)
@@ -309,7 +311,7 @@ class TorNetService : LifecycleService() {
         TorNetStore.update {
             it.copy(status = TorStatus.ON, bootstrap = 100, socksPort = socks, httpPort = http)
         }
-        TorNetStore.log("Tor подключён (${currentMode.title}). SOCKS5 127.0.0.1:$socks, HTTP 127.0.0.1:$http")
+        TorNetStore.log(L10n.s(R.string.log_connected, currentMode.title, socks, http))
         RotationSettings.setLastWorking(this, currentMode)
         lastChangeAt = System.currentTimeMillis()
 
@@ -328,7 +330,7 @@ class TorNetService : LifecycleService() {
                 val s = settings
                 if (s.count > 0 && TorNetStore.state.value.changes >= s.count) {
                     TorNetStore.update { it.copy(nextChangeAt = 0) }
-                    TorNetStore.log("Готово: IP сменён ${s.count} раз. Tor продолжает работать.")
+                    TorNetStore.log(L10n.s(R.string.log_done, s.count))
                     break
                 }
                 val seconds = Random.nextInt(s.minInterval, s.maxInterval + 1)
@@ -345,22 +347,22 @@ class TorNetService : LifecycleService() {
     private suspend fun changeIp(manual: Boolean): Boolean = changeLock.withLock {
         val control = torService?.torControlConnection
         if (TorNetStore.state.value.status != TorStatus.ON || control == null) {
-            if (manual) TorNetStore.log("Tor ещё не подключён")
+            if (manual) TorNetStore.log(L10n.s(R.string.log_not_connected))
             return false
         }
         val wait = RotationSettings.MIN_INTERVAL * 1000L - (System.currentTimeMillis() - lastChangeAt)
         if (manual && wait > 0) {
-            TorNetStore.log("Tor разрешает менять IP не чаще раза в 10 с, подождите ${(wait + 999) / 1000} с")
+            TorNetStore.log(L10n.s(R.string.log_rate_limit, (wait + 999) / 1000))
             return false
         }
         val ok = withContext(Dispatchers.IO) {
             runCatching { control.signal("NEWNYM") }
-                .onFailure { TorNetStore.log("NEWNYM не прошёл: ${it.message}") }
+                .onFailure { TorNetStore.log(L10n.s(R.string.log_newnym_failed, it.message)) }
                 .isSuccess
         }
         if (!ok) return false
         lastChangeAt = System.currentTimeMillis()
-        TorNetStore.log(if (manual) "Смена IP вручную…" else "Смена IP по таймеру…")
+        TorNetStore.log(L10n.s(if (manual) R.string.log_change_manual else R.string.log_change_timer))
         // Даём Tor собрать новую цепочку.
         delay(1500)
         refreshIp()
@@ -376,12 +378,12 @@ class TorNetService : LifecycleService() {
                 val old = TorNetStore.state.value.currentIp
                 TorNetStore.update { it.copy(currentIp = address) }
                 TorNetStore.log(
-                    if (old == null || old != address) "Новый IP: $address"
-                    else "IP пока прежний: $address (выход совпал)"
+                    if (old == null || old != address) L10n.s(R.string.log_new_ip, address)
+                    else L10n.s(R.string.log_same_ip, address)
                 )
                 return
             }
-            if (attempt == 2) TorNetStore.log("Не удалось узнать IP: ${ip.exceptionOrNull()?.message}")
+            if (attempt == 2) TorNetStore.log(L10n.s(R.string.log_ip_failed, ip.exceptionOrNull()?.message))
             delay(2000)
         }
     }
@@ -410,14 +412,14 @@ class TorNetService : LifecycleService() {
         if (want) ports += "SocksPort 0.0.0.0:$LAN_SOCKS_PORT"
         val ok = withContext(Dispatchers.IO) {
             runCatching { control.setConf(ports) }
-                .onFailure { TorNetStore.log("Не удалось открыть прокси для сети: ${it.message}") }
+                .onFailure { TorNetStore.log(L10n.s(R.string.log_lan_failed, it.message)) }
                 .isSuccess
         }
         if (!ok) return
         TorNetStore.update { it.copy(lanPort = if (want) LAN_SOCKS_PORT else 0) }
         TorNetStore.log(
-            if (want) "Прокси открыт для других устройств: SOCKS5 порт $LAN_SOCKS_PORT"
-            else "Прокси для других устройств закрыт"
+            if (want) L10n.s(R.string.log_lan_on, LAN_SOCKS_PORT)
+            else L10n.s(R.string.log_lan_off)
         )
     }
 
@@ -427,7 +429,7 @@ class TorNetService : LifecycleService() {
         rotationJob?.cancel()
         if (TorNetStore.state.value.status != TorStatus.OFF) {
             TorNetStore.update { it.copy(status = TorStatus.STOPPING, nextChangeAt = 0) }
-            TorNetStore.log("Остановка Tor")
+            TorNetStore.log(L10n.s(R.string.log_stopping))
         }
         releaseTor()
         TorNetStore.reset()
@@ -462,7 +464,7 @@ class TorNetService : LifecycleService() {
     private fun createChannel() {
         if (Build.VERSION.SDK_INT < 26) return
         val channel = NotificationChannel(
-            CHANNEL_ID, getString(R.string.notification_channel), NotificationManager.IMPORTANCE_LOW,
+            CHANNEL_ID, L10n.s(R.string.notification_channel), NotificationManager.IMPORTANCE_LOW,
         )
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
@@ -488,17 +490,18 @@ class TorNetService : LifecycleService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val title = when (state.status) {
-            TorStatus.ON -> "IP: ${state.currentIp ?: "…"}"
-            TorStatus.STARTING -> "Подключение к Tor: ${state.bootstrap}%"
+            TorStatus.ON -> L10n.s(R.string.notif_ip, state.currentIp ?: "…")
+            TorStatus.STARTING -> L10n.s(R.string.notif_connecting, state.bootstrap)
             else -> getString(R.string.app_name)
         }
         val text = when (state.status) {
             TorStatus.ON -> {
-                val limit = if (state.maxChanges > 0) " из ${state.maxChanges}" else ""
-                val mode = if (state.vpnActive) "VPN: весь трафик" else "SOCKS5 :${state.socksPort} · HTTP :${state.httpPort}"
-                "Смен IP: ${state.changes}$limit · $mode"
+                val mode = if (state.vpnActive) L10n.s(R.string.notif_vpn)
+                else "SOCKS5 :${state.socksPort} · HTTP :${state.httpPort}"
+                if (state.maxChanges > 0) L10n.s(R.string.notif_changes_of, state.changes, state.maxChanges, mode)
+                else L10n.s(R.string.notif_changes, state.changes, mode)
             }
-            else -> state.bootstrapSummary.ifEmpty { "Запуск…" }
+            else -> state.bootstrapSummary.ifEmpty { L10n.s(R.string.notif_starting) }
         }
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
@@ -510,9 +513,9 @@ class TorNetService : LifecycleService() {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
         if (state.status == TorStatus.STARTING) builder.setProgress(100, state.bootstrap, false)
         if (state.status == TorStatus.ON) {
-            builder.addAction(0, getString(R.string.new_ip), servicePendingIntent(ACTION_NEW_IP, 1))
+            builder.addAction(0, L10n.s(R.string.new_ip), servicePendingIntent(ACTION_NEW_IP, 1))
         }
-        builder.addAction(0, getString(R.string.stop), servicePendingIntent(ACTION_STOP, 2))
+        builder.addAction(0, L10n.s(R.string.stop), servicePendingIntent(ACTION_STOP, 2))
         return builder.build()
     }
 
@@ -543,9 +546,9 @@ class TorNetService : LifecycleService() {
         }
 
         fun describe(s: RotationSettings): String {
-            val interval = if (s.minInterval == s.maxInterval) "каждые ${s.minInterval} с"
-            else "каждые ${s.minInterval}–${s.maxInterval} с"
-            val count = if (s.count == 0) "без ограничения" else "${s.count} раз"
+            val interval = if (s.minInterval == s.maxInterval) L10n.s(R.string.describe_every, s.minInterval)
+            else L10n.s(R.string.describe_every_range, s.minInterval, s.maxInterval)
+            val count = if (s.count == 0) L10n.s(R.string.describe_unlimited) else L10n.s(R.string.describe_times, s.count)
             val vpn = if (s.vpn) ", VPN" else ""
             return "$interval, $count$vpn"
         }
@@ -553,7 +556,7 @@ class TorNetService : LifecycleService() {
         /** Запрос IP через HTTP-туннель Tor, так что DNS тоже идёт через Tor. */
         fun fetchExitIp(httpPort: Int): String {
             val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", httpPort))
-            var error: Exception = IllegalStateException("нет ответа")
+            var error: Exception = IllegalStateException(L10n.s(R.string.err_no_response))
             for (url in IP_SERVICES) {
                 val conn = URL(url).openConnection(proxy) as HttpURLConnection
                 try {

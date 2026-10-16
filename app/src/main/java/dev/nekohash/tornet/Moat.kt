@@ -102,7 +102,7 @@ object Moat {
             }
             try {
                 if (conn.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IllegalStateException("Moat ответил ${conn.responseCode}")
+                    throw IllegalStateException(L10n.s(R.string.log_moat_http, conn.responseCode))
                 }
                 return JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
             } finally {

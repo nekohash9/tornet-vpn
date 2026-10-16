@@ -1,22 +1,26 @@
 package dev.nekohash.tornet
 
 import android.content.Context
+import androidx.annotation.StringRes
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
 /** Способ подключения к сети Tor. */
-enum class BridgeMode(val id: String, val title: String, val stallSeconds: Int) {
-    AUTO("auto", "Авто", 0),
-    DIRECT("direct", "без мостов", 40),
-    SNOWFLAKE("snowflake", "Snowflake", 120),
-    OBFS4("obfs4", "obfs4", 75),
-    MEEK("meek", "meek", 90),
-    DNSTT("dnstt", "dnstt (через DNS)", 120),
+enum class BridgeMode(val id: String, @StringRes private val titleRes: Int, val stallSeconds: Int) {
+    AUTO("auto", R.string.mode_auto, 0),
+    DIRECT("direct", R.string.mode_direct, 40),
+    SNOWFLAKE("snowflake", R.string.mode_snowflake, 120),
+    OBFS4("obfs4", R.string.mode_obfs4, 75),
+    MEEK("meek", R.string.mode_meek, 90),
+    DNSTT("dnstt", R.string.mode_dnstt, 120),
 
     /** Мосты, полученные у Tor Project через Moat под нашу страну. */
-    MOAT("moat", "мосты от Tor Project", 90),
-    CUSTOM("custom", "свои мосты", 90);
+    MOAT("moat", R.string.mode_moat, 90),
+    CUSTOM("custom", R.string.mode_custom, 90);
+
+    /** Название на языке приложения. */
+    val title: String get() = L10n.s(titleRes)
 
     companion object {
         fun fromId(id: String?) = entries.firstOrNull { it.id == id } ?: AUTO

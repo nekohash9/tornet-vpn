@@ -27,6 +27,37 @@
             android:textAppearance="?attr/textAppearanceBodyMedium"
             android:textColor="?android:attr/textColorSecondary" />
 
+        <!-- Язык приложения -->
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/languageGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <Button
+                android:id="@+id/langSystem"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/language_system" />
+
+            <Button
+                android:id="@+id/langEn"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/language_en" />
+
+            <Button
+                android:id="@+id/langRu"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/language_ru" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
         <!-- Статус и текущий IP -->
         <com.google.android.material.card.MaterialCardView
             style="@style/Widget.Material3.CardView.Filled"

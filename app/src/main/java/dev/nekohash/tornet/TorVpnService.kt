@@ -42,11 +42,11 @@ class TorVpnService : VpnService() {
     private fun startVpn(socksPort: Int) {
         if (tun != null) return
         if (socksPort <= 0) {
-            TorNetStore.log("VPN: неизвестен SOCKS-порт Tor")
+            TorNetStore.log(L10n.s(R.string.vpn_log_no_port))
             return
         }
         if (prepare(this) != null) {
-            TorNetStore.log("VPN: нет разрешения, включите режим VPN из приложения")
+            TorNetStore.log(L10n.s(R.string.vpn_log_no_permission))
             return
         }
 
@@ -74,13 +74,13 @@ class TorVpnService : VpnService() {
         val fd = try {
             builder.establish()
         } catch (e: Exception) {
-            TorNetStore.log("VPN: не удалось создать интерфейс: ${e.message}")
+            TorNetStore.log(L10n.s(R.string.vpn_log_iface_failed, e.message))
             null
         } ?: return
 
         val config = File(filesDir, "tunnel.yml").apply { writeText(tunnelConfig(socksPort)) }
         val started = runCatching { TProxyService.TProxyStartService(config.absolutePath, fd.fd) }
-            .onFailure { TorNetStore.log("VPN: tun2socks не запустился: ${it.message}") }
+            .onFailure { TorNetStore.log(L10n.s(R.string.vpn_log_tun2socks_failed, it.message)) }
             .getOrDefault(false)
         if (!started) {
             fd.close()
@@ -88,7 +88,7 @@ class TorVpnService : VpnService() {
         }
         tun = fd
         TorNetStore.update { it.copy(vpnActive = true) }
-        TorNetStore.log("VPN включён: весь трафик телефона идёт через Tor")
+        TorNetStore.log(L10n.s(R.string.vpn_log_on))
     }
 
     private fun stopVpn() {
@@ -97,12 +97,12 @@ class TorVpnService : VpnService() {
         runCatching { fd.close() }
         tun = null
         TorNetStore.update { it.copy(vpnActive = false) }
-        TorNetStore.log("VPN выключен")
+        TorNetStore.log(L10n.s(R.string.vpn_log_off))
     }
 
     override fun onRevoke() {
         // Пользователь выключил VPN в настройках или его занял другой VPN.
-        TorNetStore.log("VPN отключён системой")
+        TorNetStore.log(L10n.s(R.string.vpn_log_revoked))
         stopVpn()
         super.onRevoke()
     }

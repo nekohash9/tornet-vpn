@@ -1,65 +1,123 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TorNet</string>
-    <string name="subtitle">Автоматическая смена IP через Tor</string>
-    <string name="notification_channel">Работа Tor</string>
-
-    <string name="status_off">Tor выключен</string>
-    <string name="status_starting">Подключение к Tor: %1$d%% %2$s</string>
-    <string name="status_on">Tor подключён</string>
-    <string name="status_stopping">Остановка…</string>
-
-    <string name="current_ip">Внешний IP</string>
-    <string name="dash">—</string>
-    <string name="changes_of">Смен IP: %1$d из %2$d</string>
-    <string name="changes_inf">Смен IP: %1$d (без ограничения)</string>
-    <string name="next_change">Следующая смена через %1$d с</string>
-
-    <string name="start">Запустить</string>
-    <string name="stop">Остановить</string>
-    <string name="new_ip">Новый IP</string>
-
-    <string name="settings">Смена IP</string>
-    <string name="interval_from">Интервал от, с</string>
-    <string name="interval_to">до, с</string>
-    <string name="count_hint">Сколько раз сменить</string>
-    <string name="count_helper">0 — бесконечно. Интервал выбирается случайно в заданных пределах, минимум 10 с.</string>
-    <string name="apply">Применить</string>
-    <string name="vpn_mode">Режим VPN — весь трафик через Tor</string>
-    <string name="vpn_help">Все приложения пойдут через Tor без настройки прокси, DNS тоже. UDP (звонки, игры, QUIC) через Tor не работает — приложения обычно переключаются на TCP.</string>
-    <string name="vpn_active">VPN включён: весь трафик через Tor</string>
-    <string name="bridges_title">Подключение к Tor</string>
-    <string name="bridges_help">Если подключение застревает на 5–10%, Tor у вас блокируют — нужны мосты. «Авто» сам перебирает все способы, пока один не сработает, и запоминает удачный.</string>
-    <string name="bridge_auto">Авто — перебирать, пока не подключится (рекомендуется)</string>
-    <string name="bridge_direct">Без мостов</string>
-    <string name="bridge_obfs4">obfs4 — встроенные мосты</string>
-    <string name="bridge_snowflake">Snowflake — через волонтёров, обходит большинство блокировок</string>
-    <string name="bridge_dnstt">dnstt — через DNS Google, медленно, но почти не блокируется</string>
-    <string name="bridge_meek">meek — через CDN</string>
-    <string name="bridge_custom">Свои мосты</string>
-    <string name="custom_bridges_hint">Свои мосты (по строке на мост)</string>
-    <string name="custom_bridges_helper">obfs4, webtunnel, snowflake… Взять: Telegram-бот @GetBridgesBot, bridges.torproject.org или кнопка ниже. В «Авто» пробуются первыми.</string>
-    <string name="fetch_bridges">Запросить свежие мосты у Tor Project</string>
-    <string name="fetching_bridges">Запрашиваю мосты…</string>
-    <string name="fetched_bridges">Получено мостов: %1$d</string>
-    <string name="fetch_failed">Не удалось получить мосты: %1$s</string>
-    <string name="vpn_denied">Без разрешения VPN режим не включить</string>
-
-    <string name="proxy_title">Прокси для других приложений</string>
-    <string name="socks_line">SOCKS5  127.0.0.1:%1$s</string>
-    <string name="http_line">HTTP    127.0.0.1:%1$s</string>
-    <string name="proxy_help">Нажмите на строку, чтобы скопировать адрес. Укажите его в браузере (Firefox, Kiwi), Telegram или в настройках Wi-Fi → Прокси (HTTP-порт, работает для HTTPS-сайтов).</string>
-    <string name="copied">Скопировано: %1$s</string>
-
-    <string name="tg_title">Telegram через Tor</string>
-    <string name="tg_help">Telegram откроется с готовым прокси — останется нажать «Подключить». Сообщения и файлы идут через Tor, звонки — нет (Tor не передаёт UDP).</string>
-    <string name="tg_connect">Подключить Telegram к прокси</string>
-    <string name="tg_not_installed">Telegram не установлен</string>
-    <string name="tor_not_running">Сначала запустите Tor</string>
-    <string name="lan_share">Раздавать прокси в Wi-Fi и точке доступа</string>
-    <string name="lan_address">SOCKS5  %1$s:%2$d</string>
-    <string name="lan_no_network">SOCKS5  порт %1$d — нет Wi-Fi или точки доступа</string>
-    <string name="lan_send_link">Отправить ссылку для Telegram</string>
-    <string name="lan_help">Чтобы компьютер или другой телефон в той же сети (или подключённый к вашей точке доступа) ходил через Tor: откройте на нём ссылку t.me/socks или укажите прокси вручную. Прокси без пароля — включайте только в своей сети.</string>
-    <string name="log">Журнал</string>
+    <string name="app_name" translatable="false">TorNet</string>
+    <string name="subtitle">Automatic IP rotation over Tor</string>
+    <string name="notification_channel">Tor service</string>
+    <string name="status_off">Tor is off</string>
+    <string name="status_starting">Connecting to Tor: %1$d%% %2$s</string>
+    <string name="status_on">Tor is connected</string>
+    <string name="status_stopping">Stopping…</string>
+    <string name="current_ip">Exit IP</string>
+    <string name="dash" translatable="false">—</string>
+    <string name="changes_of">IP changes: %1$d of %2$d</string>
+    <string name="changes_inf">IP changes: %1$d (unlimited)</string>
+    <string name="next_change">Next change in %1$d s</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="new_ip">New IP</string>
+    <string name="settings">IP rotation</string>
+    <string name="interval_from">Interval from, s</string>
+    <string name="interval_to">to, s</string>
+    <string name="count_hint">How many times</string>
+    <string name="count_helper">0 — forever. The interval is picked randomly within the range, at least 10 s.</string>
+    <string name="apply">Apply</string>
+    <string name="vpn_mode">VPN mode — all traffic through Tor</string>
+    <string name="vpn_help">All apps go through Tor without proxy setup, DNS included. UDP (calls, games, QUIC) doesn\'t work over Tor — apps usually fall back to TCP.</string>
+    <string name="vpn_active">VPN on: all traffic through Tor</string>
+    <string name="bridges_title">Connecting to Tor</string>
+    <string name="bridges_help">If connecting gets stuck at 5–10%, Tor is blocked for you — you need bridges. Auto tries every method until one works and remembers it.</string>
+    <string name="bridge_auto">Auto — keep trying until connected (recommended)</string>
+    <string name="bridge_direct">No bridges</string>
+    <string name="bridge_obfs4">obfs4 — built-in bridges</string>
+    <string name="bridge_snowflake">Snowflake — via volunteers, gets around most blocking</string>
+    <string name="bridge_dnstt">dnstt — over Google DNS, slow but very hard to block</string>
+    <string name="bridge_meek">meek — via CDN</string>
+    <string name="bridge_custom">Custom bridges</string>
+    <string name="custom_bridges_hint">Custom bridges (one per line)</string>
+    <string name="custom_bridges_helper">obfs4, webtunnel, snowflake… Get them from the Telegram bot @GetBridgesBot, bridges.torproject.org or the button below. Auto tries them first.</string>
+    <string name="fetch_bridges">Get fresh bridges from Tor Project</string>
+    <string name="fetching_bridges">Requesting bridges…</string>
+    <string name="fetched_bridges">Bridges received: %1$d</string>
+    <string name="fetch_failed">Could not get bridges: %1$s</string>
+    <string name="vpn_denied">VPN mode can\'t be turned on without permission</string>
+    <string name="proxy_title">Proxy for other apps</string>
+    <string name="socks_line" translatable="false">SOCKS5  127.0.0.1:%1$s</string>
+    <string name="http_line" translatable="false">HTTP    127.0.0.1:%1$s</string>
+    <string name="proxy_help">Tap a line to copy the address. Use it in a browser (Firefox, Kiwi), Telegram or Wi-Fi settings → Proxy (HTTP port, works for HTTPS sites).</string>
+    <string name="copied">Copied: %1$s</string>
+    <string name="tg_title">Telegram over Tor</string>
+    <string name="tg_help">Telegram opens with the proxy filled in — just tap Connect. Messages and files go through Tor, calls don\'t (Tor doesn\'t carry UDP).</string>
+    <string name="tg_connect">Connect Telegram to the proxy</string>
+    <string name="tg_not_installed">Telegram is not installed</string>
+    <string name="tor_not_running">Start Tor first</string>
+    <string name="lan_share">Share the proxy over Wi-Fi and hotspot</string>
+    <string name="lan_address" translatable="false">SOCKS5  %1$s:%2$d</string>
+    <string name="lan_no_network">SOCKS5  port %1$d — no Wi-Fi or hotspot</string>
+    <string name="lan_send_link">Send a link for Telegram</string>
+    <string name="lan_help">To route a computer or another phone on the same network (or on your hotspot) through Tor: open the t.me/socks link on it or set the proxy manually. The proxy has no password — only turn this on in your own network.</string>
+    <string name="log">Log</string>
+    <string name="language_title">Language</string>
+    <string name="language_system">System</string>
+    <string name="language_en" translatable="false">English</string>
+    <string name="language_ru" translatable="false">Русский</string>
+    <string name="mode_auto">Auto</string>
+    <string name="mode_direct">no bridges</string>
+    <string name="mode_snowflake" translatable="false">Snowflake</string>
+    <string name="mode_obfs4" translatable="false">obfs4</string>
+    <string name="mode_meek" translatable="false">meek</string>
+    <string name="mode_dnstt">dnstt (over DNS)</string>
+    <string name="mode_moat">bridges from Tor Project</string>
+    <string name="mode_custom">custom bridges</string>
+    <string name="log_tor_error">Tor error: %1$s</string>
+    <string name="log_new_method">New connection method: %1$s</string>
+    <string name="log_new_settings">New settings: %1$s</string>
+    <string name="log_starting">Starting Tor… (%1$s)</string>
+    <string name="log_torservice_failed">Could not start TorService</string>
+    <string name="log_no_custom">No custom bridges set</string>
+    <string name="log_moat_request">Requesting bridges from Tor Project (Moat)…</string>
+    <string name="log_moat_got">Moat returned %1$d bridges</string>
+    <string name="log_moat_failed">Moat unavailable: %1$s</string>
+    <string name="log_moat_http">Moat returned HTTP %1$d</string>
+    <string name="log_next_round">Nothing has worked yet, trying all methods again</string>
+    <string name="log_transport_start_failed">%1$s: could not start the transport: %2$s</string>
+    <string name="log_transport_error">Transport %1$s: %2$s</string>
+    <string name="log_transport_stopped">Transport %1$s stopped: %2$s</string>
+    <string name="log_connecting">Connecting: %1$s</string>
+    <string name="log_connecting_bridges">Connecting: %1$s (%2$d bridges)</string>
+    <string name="log_bridges_apply_failed">Could not apply bridges: %1$s</string>
+    <string name="log_stall_next">%1$s: no progress for %2$d s, trying the next method</string>
+    <string name="log_stall_hint">%1$s: connection is stuck. Try Auto mode or other bridges</string>
+    <string name="log_bootstrap">Connecting: %1$d%% %2$s</string>
+    <string name="log_connected">Tor connected (%1$s). SOCKS5 127.0.0.1:%2$d, HTTP 127.0.0.1:%3$d</string>
+    <string name="log_done">Done: IP changed %1$d times. Tor keeps running.</string>
+    <string name="log_not_connected">Tor is not connected yet</string>
+    <string name="log_rate_limit">Tor allows changing IP at most once every 10 s, wait %1$d s</string>
+    <string name="log_newnym_failed">NEWNYM failed: %1$s</string>
+    <string name="log_change_manual">Changing IP…</string>
+    <string name="log_change_timer">Changing IP on timer…</string>
+    <string name="log_new_ip">New IP: %1$s</string>
+    <string name="log_same_ip">IP unchanged: %1$s (same exit relay)</string>
+    <string name="log_ip_failed">Could not get the IP: %1$s</string>
+    <string name="log_lan_failed">Could not open the proxy to the network: %1$s</string>
+    <string name="log_lan_on">Proxy open to other devices: SOCKS5 port %1$d</string>
+    <string name="log_lan_off">Proxy closed to other devices</string>
+    <string name="log_stopping">Stopping Tor</string>
+    <string name="err_no_response">no response</string>
+    <string name="describe_every">every %1$d s</string>
+    <string name="describe_every_range">every %1$d–%2$d s</string>
+    <string name="describe_unlimited">unlimited</string>
+    <string name="describe_times">%1$d times</string>
+    <string name="notif_ip">IP: %1$s</string>
+    <string name="notif_connecting">Connecting to Tor: %1$d%%</string>
+    <string name="notif_changes">IP changes: %1$d · %2$s</string>
+    <string name="notif_changes_of">IP changes: %1$d of %2$d · %3$s</string>
+    <string name="notif_vpn">VPN: all traffic</string>
+    <string name="notif_starting">Starting…</string>
+    <string name="vpn_log_no_port">VPN: unknown Tor SOCKS port</string>
+    <string name="vpn_log_no_permission">VPN: no permission, turn VPN mode on from the app</string>
+    <string name="vpn_log_iface_failed">VPN: could not create the interface: %1$s</string>
+    <string name="vpn_log_tun2socks_failed">VPN: tun2socks did not start: %1$s</string>
+    <string name="vpn_log_on">VPN on: all phone traffic goes through Tor</string>
+    <string name="vpn_log_off">VPN off</string>
+    <string name="vpn_log_revoked">VPN was turned off by the system</string>
 </resources>

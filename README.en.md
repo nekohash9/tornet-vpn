@@ -11,7 +11,8 @@ no Orbot, no root.
 > Which file to pick: `…-arm64-v8a.apk` for almost every modern phone,
 > `…-universal.apk` if you are not sure. Android 7.0 or newer.
 
-> The app interface is currently in Russian only.
+> The app is in English and Russian: it follows the system language, or pick one with the
+> **System / English / Русский** switch at the top of the screen.
 
 ## Features
 
@@ -29,14 +30,16 @@ no Orbot, no root.
   use this phone's Tor (a `t.me/socks` link for Telegram Desktop).
 - **Local proxies** SOCKS5 `127.0.0.1:9050` and HTTP `127.0.0.1:8118` for any app.
 - Event log: connection progress, every IP change, errors.
+- English and Russian interface with an in-app language switch (Android 13+ also lets you pick it in
+  the system app settings).
 
 ## How to use
 
 1. Install the APK (allow installing from unknown sources).
-2. Tap **Запустить** (Start). The first start can take a couple of minutes.
-3. For all traffic, turn on **Режим VPN** (VPN mode) and allow the VPN in the system dialog.
-4. Can't connect? Keep **Авто** (Auto) under "Подключение к Tor" (Connecting to Tor), or paste bridges
-   from the Telegram bot [@GetBridgesBot](https://t.me/GetBridgesBot).
+2. Tap **Start**. The first start can take a couple of minutes.
+3. For all traffic, turn on **VPN mode** and allow the VPN in the system dialog.
+4. Can't connect? Keep **Auto** under "Connecting to Tor", or paste bridges from the Telegram bot
+   [@GetBridgesBot](https://t.me/GetBridgesBot).
 
 ## Good to know
 

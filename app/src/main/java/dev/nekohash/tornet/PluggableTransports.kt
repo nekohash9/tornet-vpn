@@ -20,11 +20,11 @@ object PluggableTransports {
         override fun connected(name: String?) = Unit
 
         override fun error(name: String?, error: Exception?) {
-            TorNetStore.log("Транспорт $name: ${error?.message}")
+            TorNetStore.log(L10n.s(R.string.log_transport_error, name, error?.message))
         }
 
         override fun stopped(name: String?, error: Exception?) {
-            if (error != null) TorNetStore.log("Транспорт $name остановлен: ${error.message}")
+            if (error != null) TorNetStore.log(L10n.s(R.string.log_transport_stopped, name, error.message))
         }
     }
 

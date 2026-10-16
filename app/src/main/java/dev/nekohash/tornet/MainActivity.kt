@@ -59,6 +59,8 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
+        setupLanguage()
+
         val saved = RotationSettings.load(this)
         binding.minIntervalInput.setText(saved.minInterval.toString())
         binding.maxIntervalInput.setText(saved.maxInterval.toString())
@@ -112,6 +114,21 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+        }
+    }
+
+    /** Переключатель языка: Системный / English / Русский. Экран пересоздаётся сам. */
+    private fun setupLanguage() {
+        val buttons = mapOf(
+            L10n.SYSTEM to R.id.langSystem,
+            "en" to R.id.langEn,
+            "ru" to R.id.langRu,
+        )
+        binding.languageGroup.check(buttons[L10n.current()] ?: R.id.langSystem)
+        binding.languageGroup.addOnButtonCheckedListener { _, id, checked ->
+            if (!checked) return@addOnButtonCheckedListener
+            val language = buttons.entries.first { it.value == id }.key
+            if (language != L10n.current()) L10n.set(language)
         }
     }
 
