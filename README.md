@@ -1,5 +1,7 @@
 # TorNet
 
+**Русский** · [English](README.en.md)
+
 **Tor для Android с автоматической сменой IP, мостами от блокировок и режимом VPN.**
 Мобильная версия идеи [tornet](https://github.com/ByteBreach/tornet): Tor работает прямо в
 приложении — Orbot и root не нужны.
@@ -103,9 +105,3 @@ git push origin v1.4.0
 tor-android и jtorctl (BSD-3-Clause), IPtProxy (MIT) с lyrebird и Snowflake (BSD),
 hev-socks5-tunnel (MIT).
 
----
-
-**English:** TorNet is an Android app that runs Tor in-app, rotates your exit IP on a timer,
-routes all traffic through Tor in VPN mode, and gets around censorship with obfs4, Snowflake,
-dnstt, meek or custom bridges (with automatic fallback and Moat). UI is in Russian.
-[Download the latest release](https://github.com/nekohash9/tornet-vpn/releases/latest).
