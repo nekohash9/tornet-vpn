@@ -1,0 +1,3 @@
+[submodule "app/jni/hev-socks5-tunnel"]
+	path = app/jni/hev-socks5-tunnel
+	url = https://github.com/heiher/hev-socks5-tunnel

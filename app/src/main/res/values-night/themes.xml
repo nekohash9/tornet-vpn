@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TorNet" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/tor_purple_light</item>
+        <item name="colorSecondary">@color/tor_purple_light</item>
+    </style>
+</resources>

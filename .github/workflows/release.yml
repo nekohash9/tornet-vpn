@@ -1,0 +1,82 @@
+name: Release
+
+# Публикация: git tag v1.4.0 && git push origin v1.4.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+          echo "TORNET_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "TORNET_VERSION_CODE=$(( MAJOR * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))" >> "$GITHUB_ENV"
+
+      # Постоянный ключ подписи обязателен: если APK подписан другим ключом,
+      # Android не даст поставить обновление поверх.
+      - name: Release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TORNET_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Не задан секрет TORNET_KEYSTORE_BASE64 — см. раздел «Публикация» в README"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "TORNET_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        env:
+          TORNET_KEYSTORE_PASSWORD: ${{ secrets.TORNET_KEYSTORE_PASSWORD }}
+          TORNET_KEY_ALIAS: ${{ secrets.TORNET_KEY_ALIAS }}
+          TORNET_KEY_PASSWORD: ${{ secrets.TORNET_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Collect APKs
+        run: |
+          mkdir out
+          for f in app/build/outputs/apk/release/app-*-release.apk; do
+            abi=$(basename "$f" | sed -E 's/app-(.*)-release.apk/\1/')
+            cp "$f" "out/TorNet-$TORNET_VERSION_NAME-$abi.apk"
+          done
+          cd out && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          CERT=$("$APKSIGNER" verify --print-certs "TorNet-$TORNET_VERSION_NAME-universal.apk" | grep 'SHA-256 digest' | head -1 | awk '{print $NF}')
+          echo "CERT_SHA256=$CERT" >> "$GITHUB_ENV"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: TorNet ${{ env.TORNET_VERSION_NAME }}
+          files: out/*
+          generate_release_notes: true
+          body: |
+            ## Какой файл скачать
+
+            | Файл | Для чего |
+            | --- | --- |
+            | `TorNet-${{ env.TORNET_VERSION_NAME }}-arm64-v8a.apk` | почти все современные телефоны |
+            | `TorNet-${{ env.TORNET_VERSION_NAME }}-armeabi-v7a.apk` | старые 32-битные телефоны |
+            | `TorNet-${{ env.TORNET_VERSION_NAME }}-universal.apk` | если не знаете — подойдёт любому устройству |
+            | `x86` / `x86_64` | эмуляторы и Android на ПК |
+
+            Android 7.0+. При установке разрешите «Установку из неизвестных источников».
+
+            Сертификат подписи (SHA-256): `${{ env.CERT_SHA256 }}`
