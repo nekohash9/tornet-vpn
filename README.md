@@ -81,6 +81,8 @@ git tag v1.4.0
 git push origin v1.4.0
 ```
 
+Или без командной строки: **Actions → Release → Run workflow**, указать версию (`1.4.0`).
+
 Перед первым релизом добавьте секреты репозитория (Settings → Secrets and variables → Actions):
 `TORNET_KEYSTORE_BASE64` (keystore в base64), `TORNET_KEYSTORE_PASSWORD`, `TORNET_KEY_ALIAS`,
 `TORNET_KEY_PASSWORD`. Ключ должен быть всегда один и тот же — иначе обновление не встанет поверх.

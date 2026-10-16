@@ -1,9 +1,15 @@
 name: Release
 
 # Публикация: git tag v1.4.0 && git push origin v1.4.0
+# или Actions → Release → Run workflow с номером версии (тег создастся сам).
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия, например 1.4.0"
+        required: true
 
 permissions:
   contents: write
@@ -25,9 +31,12 @@ jobs:
 
       - name: Version from tag
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ inputs.version }}"
+          [ -z "$VERSION" ] && VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION#v}"
           IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
           echo "TORNET_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "TORNET_TAG=v$VERSION" >> "$GITHUB_ENV"
           echo "TORNET_VERSION_CODE=$(( MAJOR * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))" >> "$GITHUB_ENV"
 
       # Постоянный ключ подписи обязателен: если APK подписан другим ключом,
@@ -65,6 +74,9 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           name: TorNet ${{ env.TORNET_VERSION_NAME }}
+          tag_name: ${{ env.TORNET_TAG }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
           files: out/*
           generate_release_notes: true
           body: |
