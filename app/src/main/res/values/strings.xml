@@ -120,4 +120,11 @@
     <string name="vpn_log_on">VPN on: all phone traffic goes through Tor</string>
     <string name="vpn_log_off">VPN off</string>
     <string name="vpn_log_revoked">VPN was turned off by the system</string>
+    <string name="exit_title">Exit country (priority region)</string>
+    <string name="exit_any">Any country</string>
+    <string name="exit_help">Your IP will only be from the selected countries. Fewer countries means fewer exit relays: slower, and sometimes no connection at all.</string>
+    <string name="exit_pick_title">Exit countries</string>
+    <string name="log_exit_set">Exit countries: %1$s</string>
+    <string name="log_exit_any">Exit country: any</string>
+    <string name="log_exit_no_geoip">No GeoIP database in this build — exit country selection is unavailable</string>
 </resources>

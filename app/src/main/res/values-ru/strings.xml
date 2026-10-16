@@ -110,4 +110,11 @@
     <string name="vpn_log_on">VPN включён: весь трафик телефона идёт через Tor</string>
     <string name="vpn_log_off">VPN выключен</string>
     <string name="vpn_log_revoked">VPN отключён системой</string>
+    <string name="exit_title">Страна выхода (приоритетный регион)</string>
+    <string name="exit_any">Любая страна</string>
+    <string name="exit_help">IP будет только из выбранных стран. Чем меньше стран — тем меньше выходных узлов: медленнее, а иногда и не подключиться.</string>
+    <string name="exit_pick_title">Страны выхода</string>
+    <string name="log_exit_set">Страны выхода: %1$s</string>
+    <string name="log_exit_any">Страна выхода: любая</string>
+    <string name="log_exit_no_geoip">В этой сборке нет базы GeoIP — выбор страны выхода недоступен</string>
 </resources>

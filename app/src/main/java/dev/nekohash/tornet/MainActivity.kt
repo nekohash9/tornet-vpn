@@ -22,6 +22,7 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.nekohash.tornet.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -32,6 +33,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private var exitCountries: List<String> = emptyList()
 
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { startTor() }
@@ -66,6 +68,9 @@ class MainActivity : AppCompatActivity() {
         binding.maxIntervalInput.setText(saved.maxInterval.toString())
         binding.countInput.setText(saved.count.toString())
         binding.vpnSwitch.isChecked = saved.vpn
+        exitCountries = ExitCountries.parse(saved.exitCountries)
+        renderExitButton()
+        binding.exitButton.setOnClickListener { pickExitCountries() }
         binding.bridgeGroup.check(radioFor(saved.bridgeMode))
         binding.customBridgesInput.setText(saved.customBridges)
         binding.bridgeGroup.setOnCheckedChangeListener { _, _ -> binding.applyButton.isEnabled = true }
@@ -115,6 +120,38 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /** Выбор стран выхода: список популярных стран + уже выбранные. */
+    private fun pickExitCountries() {
+        val codes = (exitCountries + ExitCountries.COMMON).distinct()
+        val labels = codes.map { ExitCountries.label(it) }.toTypedArray()
+        val checked = codes.map { it in exitCountries }.toBooleanArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.exit_pick_title)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                exitCountries = codes.filterIndexed { i, _ -> checked[i] }
+                onExitChanged()
+            }
+            .setNeutralButton(R.string.exit_any) { _, _ ->
+                exitCountries = emptyList()
+                onExitChanged()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun onExitChanged() {
+        renderExitButton()
+        binding.applyButton.isEnabled = true
+        // Если Tor уже работает, применяем сразу.
+        if (TorNetStore.state.value.status != TorStatus.OFF) startTor()
+    }
+
+    private fun renderExitButton() {
+        binding.exitButton.text = if (exitCountries.isEmpty()) getString(R.string.exit_any)
+        else exitCountries.joinToString(", ") { ExitCountries.label(it) }
     }
 
     /** Переключатель языка: Системный / English / Русский. Экран пересоздаётся сам. */
@@ -167,6 +204,7 @@ class MainActivity : AppCompatActivity() {
             shareLan = binding.lanSwitch.isChecked,
             bridgeMode = modeFor(binding.bridgeGroup.checkedRadioButtonId),
             customBridges = binding.customBridgesInput.text?.toString().orEmpty(),
+            exitCountries = exitCountries.joinToString(","),
         ).normalized()
         RotationSettings.save(this, s)
         binding.minIntervalInput.setText(s.minInterval.toString())
@@ -186,6 +224,8 @@ class MainActivity : AppCompatActivity() {
         bootstrapProgress.setProgressCompat(state.bootstrap, true)
 
         ipText.text = state.currentIp ?: getString(R.string.dash)
+        countryText.isVisible = state.exitCountry != null
+        countryText.text = state.exitCountry?.let { ExitCountries.label(it) }.orEmpty()
         changesText.text = if (state.status == TorStatus.ON) {
             if (state.maxChanges > 0) getString(R.string.changes_of, state.changes, state.maxChanges)
             else getString(R.string.changes_inf, state.changes)

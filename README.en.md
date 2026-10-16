@@ -18,6 +18,8 @@ no Orbot, no root.
 
 - **IP rotation on a timer** — fixed or random interval ("from–to"), a set number of times or
   forever. A "New IP" button in the app and in the notification.
+- **Priority region** — exit IP only from the countries you pick (e.g. Germany and the Netherlands).
+  The current exit country and flag are shown next to the IP.
 - **VPN mode** — all phone traffic goes through Tor, DNS included. No per-app proxy setup.
   Android's "Always-on VPN" is supported.
 - **Bridges against blocking** — if connecting gets stuck at 5–10%:
@@ -73,6 +75,7 @@ Requires JDK 17, Android SDK and NDK.
 ```sh
 git clone --recursive https://github.com/nekohash9/tornet-vpn
 cd tornet-vpn
+python3 tools/fetch_geoip.py   # GeoIP for exit-country selection (optional)
 ./gradlew assembleRelease
 # app/build/outputs/apk/release/
 ```

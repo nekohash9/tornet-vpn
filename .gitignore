@@ -9,3 +9,4 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+app/src/main/assets/geoip

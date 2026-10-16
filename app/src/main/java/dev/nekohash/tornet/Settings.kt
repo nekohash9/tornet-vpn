@@ -15,12 +15,15 @@ data class RotationSettings(
     val customBridges: String = "",
     /** Открыть SOCKS5-прокси для других устройств в Wi-Fi / точке доступа. */
     val shareLan: Boolean = false,
+    /** Приоритетный регион: коды стран выхода через запятую, пусто — любые. */
+    val exitCountries: String = "",
 ) {
     fun normalized(): RotationSettings {
         // Tor пропускает NEWNYM чаще, чем раз в 10 секунд, так что меньше нет смысла.
         val min = minInterval.coerceIn(MIN_INTERVAL, MAX_INTERVAL)
         val max = maxInterval.coerceIn(min, MAX_INTERVAL)
-        return copy(minInterval = min, maxInterval = max, count = count.coerceAtLeast(0), customBridges = customBridges.trim())
+        return copy(minInterval = min, maxInterval = max, count = count.coerceAtLeast(0), customBridges = customBridges.trim(),
+            exitCountries = ExitCountries.parse(exitCountries).joinToString(","))
     }
 
     companion object {
@@ -39,6 +42,7 @@ data class RotationSettings(
                 BridgeMode.fromId(p.getString("bridge_mode", null)),
                 p.getString("custom_bridges", "").orEmpty(),
                 p.getBoolean("share_lan", false),
+                p.getString("exit_countries", "").orEmpty(),
             )
         }
 
@@ -51,6 +55,7 @@ data class RotationSettings(
                 .putString("bridge_mode", s.bridgeMode.id)
                 .putString("custom_bridges", s.customBridges)
                 .putBoolean("share_lan", s.shareLan)
+                .putString("exit_countries", s.exitCountries)
                 .apply()
         }
 

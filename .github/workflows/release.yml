@@ -29,6 +29,10 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # База GeoIP для выбора страны выхода.
+      - name: Fetch GeoIP
+        run: python3 tools/fetch_geoip.py
+
       - name: Version from tag
         run: |
           VERSION="${{ inputs.version }}"

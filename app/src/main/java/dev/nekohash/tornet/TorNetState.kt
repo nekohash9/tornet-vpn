@@ -17,6 +17,8 @@ data class TorNetState(
     val socksPort: Int = 0,
     val httpPort: Int = 0,
     val currentIp: String? = null,
+    /** Страна текущего выхода по базе GeoIP Tor (код вроде "de"). */
+    val exitCountry: String? = null,
     val changes: Int = 0,
     /** 0 — менять бесконечно, как `--count 0` в tornet. */
     val maxChanges: Int = 0,

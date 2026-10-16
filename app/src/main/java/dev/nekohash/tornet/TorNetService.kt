@@ -63,6 +63,7 @@ class TorNetService : LifecycleService() {
     private var stallHinted = false
     private var switching = false
     private var appliedBridges: Pair<BridgeMode, String>? = null
+    private var appliedExit: String? = null
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -111,6 +112,9 @@ class TorNetService : LifecycleService() {
         watchNotification()
 
         val status = TorNetStore.state.value.status
+        if (bound && settings.exitCountries != appliedExit) {
+            lifecycleScope.launch { applyExitCountries() }
+        }
         if (bound && settings.bridgeMode to settings.customBridges != appliedBridges) {
             // Поменяли способ подключения на ходу — переподключаемся без перезапуска Tor.
             TorNetStore.log(L10n.s(R.string.log_new_method, settings.bridgeMode.title))
@@ -224,7 +228,13 @@ class TorNetService : LifecycleService() {
             }
             val applied = if (firstStart) {
                 withContext(Dispatchers.IO) {
-                    runCatching { TorService.getTorrc(this@TorNetService).writeText(config.joinToString("\n") + "\n") }
+                    runCatching {
+                        val countries = ExitCountries.parse(settings.exitCountries)
+                        val exit = ExitCountries.torConfig(this@TorNetService, countries)
+                        if (countries.isNotEmpty() && exit.size < 2) TorNetStore.log(L10n.s(R.string.log_exit_no_geoip))
+                        appliedExit = settings.exitCountries
+                        TorService.getTorrc(this@TorNetService).writeText((config + exit).joinToString("\n") + "\n")
+                    }
                 }.isSuccess
             } else {
                 applyToRunningTor(config)
@@ -369,6 +379,34 @@ class TorNetService : LifecycleService() {
         true
     }
 
+    /** Меняет страны выхода на работающем Tor и сразу берёт новый IP. */
+    private suspend fun applyExitCountries() {
+        val control = torService?.torControlConnection ?: return
+        val countries = ExitCountries.parse(settings.exitCountries)
+        val geoip = ExitCountries.geoipFile(this)
+        if (countries.isNotEmpty() && geoip == null) {
+            TorNetStore.log(L10n.s(R.string.log_exit_no_geoip))
+            appliedExit = settings.exitCountries
+            return
+        }
+        val ok = withContext(Dispatchers.IO) {
+            runCatching {
+                if (countries.isEmpty()) control.resetConf(listOf("ExitNodes"))
+                else control.setConf(listOf("GeoIPFile ${geoip!!.absolutePath}", ExitCountries.exitNodes(countries)))
+            }.onFailure { TorNetStore.log(L10n.s(R.string.log_bridges_apply_failed, it.message)) }.isSuccess
+        }
+        if (!ok) return
+        appliedExit = settings.exitCountries
+        TorNetStore.log(
+            if (countries.isEmpty()) L10n.s(R.string.log_exit_any)
+            else L10n.s(R.string.log_exit_set, countries.joinToString(", ") { ExitCountries.label(it) })
+        )
+        if (TorNetStore.state.value.status == TorStatus.ON) {
+            lastChangeAt = 0
+            changeIp(manual = true)
+        }
+    }
+
     private suspend fun refreshIp() {
         val port = TorNetStore.state.value.httpPort
         if (port <= 0) return
@@ -376,10 +414,14 @@ class TorNetService : LifecycleService() {
             val ip = withContext(Dispatchers.IO) { runCatching { fetchExitIp(port) } }
             ip.onSuccess { address ->
                 val old = TorNetStore.state.value.currentIp
-                TorNetStore.update { it.copy(currentIp = address) }
+                val cc = withContext(Dispatchers.IO) {
+                    runCatching { torService?.getInfo("ip-to-country/$address") }.getOrNull()
+                }?.trim()?.lowercase()?.takeIf { it.length == 2 && it != "??" }
+                TorNetStore.update { it.copy(currentIp = address, exitCountry = cc) }
+                val shown = if (cc != null) "$address · ${ExitCountries.label(cc)}" else address
                 TorNetStore.log(
-                    if (old == null || old != address) L10n.s(R.string.log_new_ip, address)
-                    else L10n.s(R.string.log_same_ip, address)
+                    if (old == null || old != address) L10n.s(R.string.log_new_ip, shown)
+                    else L10n.s(R.string.log_same_ip, shown)
                 )
                 return
             }
@@ -441,6 +483,7 @@ class TorNetService : LifecycleService() {
     private fun releaseTor() {
         PluggableTransports.stopAll()
         appliedBridges = null
+        appliedExit = null
         if (receiverRegistered) {
             LocalBroadcastManager.getInstance(this).unregisterReceiver(torReceiver)
             receiverRegistered = false
@@ -490,7 +533,8 @@ class TorNetService : LifecycleService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val title = when (state.status) {
-            TorStatus.ON -> L10n.s(R.string.notif_ip, state.currentIp ?: "…")
+            TorStatus.ON -> L10n.s(R.string.notif_ip, state.currentIp ?: "…") +
+                (state.exitCountry?.let { " " + ExitCountries.flag(it) } ?: "")
             TorStatus.STARTING -> L10n.s(R.string.notif_connecting, state.bootstrap)
             else -> getString(R.string.app_name)
         }
