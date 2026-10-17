@@ -86,6 +86,10 @@ class MainActivity : AppCompatActivity() {
         binding.bridgeGroup.setOnCheckedChangeListener { _, _ -> binding.applyButton.isEnabled = true }
         binding.customBridgesInput.doAfterTextChanged { binding.applyButton.isEnabled = true }
         binding.fetchBridgesButton.setOnClickListener { fetchBridges() }
+        binding.bridgesBotButton.setOnClickListener {
+            // Telegram обычно доступен, а бот выдаёт свежие obfs4/webtunnel-мосты.
+            runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/GetBridgesBot"))) }
+        }
         binding.vpnSwitch.setOnCheckedChangeListener { _, _ -> binding.applyButton.isEnabled = true }
 
         binding.lanSwitch.isChecked = saved.shareLan
@@ -312,7 +316,10 @@ class MainActivity : AppCompatActivity() {
         binding.fetchBridgesButton.isEnabled = false
         binding.fetchBridgesButton.setText(R.string.fetching_bridges)
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching { Moat.fetchBridges(this@MainActivity) } }
+            // Если Tor уже подключён — запрос идёт через него и проходит при любых блокировках.
+            val state = TorNetStore.state.value
+            val port = if (state.status == TorStatus.ON) state.httpPort else 0
+            val result = withContext(Dispatchers.IO) { runCatching { Moat.fetchBridges(this@MainActivity, port) } }
             binding.fetchBridgesButton.isEnabled = true
             binding.fetchBridgesButton.setText(R.string.fetch_bridges)
             result.onSuccess { bridges ->
@@ -324,7 +331,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 Toast.makeText(this@MainActivity, getString(R.string.fetched_bridges, bridges.size), Toast.LENGTH_SHORT).show()
             }.onFailure {
-                Toast.makeText(this@MainActivity, getString(R.string.fetch_failed, it.message), Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, getString(R.string.fetch_failed_hint), Toast.LENGTH_LONG).show()
+                TorNetStore.log(getString(R.string.fetch_failed, it.message))
             }
         }
     }

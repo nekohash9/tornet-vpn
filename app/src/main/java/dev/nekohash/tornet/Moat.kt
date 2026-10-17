@@ -41,30 +41,41 @@ object Moat {
 
     private val TRANSPORTS = listOf("obfs4", "webtunnel", "snowflake", "dnstt")
 
+    private const val DIRECT_BASE = "https://bridges.torproject.org/moat/circumvention/"
+
     /**
      * Запрашивает мосты для страны пользователя. Заодно обновляет встроенные мосты.
+     * Порядок: через уже подключённый Tor (если [torHttpPort] > 0) — это работает всегда;
+     * затем meek-туннель через CDN; затем dnstt через DNS Google.
      * Возвращает строки мостов (может быть пустым) или кидает исключение, если Moat недоступен.
      * Блокирующий вызов — только не на главном потоке.
      */
-    fun fetchBridges(context: Context): List<BridgeLine> {
+    fun fetchBridges(context: Context, torHttpPort: Int = 0): List<BridgeLine> {
         val country = country(context)
+        val body = JSONObject().put("transports", JSONArray(TRANSPORTS))
+        if (country != null) body.put("country", country)
         var lastError: Exception? = null
+        var builtinUpdated = false
+
+        fun attempt(baseUrl: String, open: (String, JSONObject?) -> JSONObject): List<BridgeLine>? = try {
+            if (!builtinUpdated) {
+                runCatching { open(baseUrl + "builtin", null) }
+                    .onSuccess { BuiltInBridges.update(context, it); builtinUpdated = true }
+            }
+            extract(open(baseUrl + "settings", body)).ifEmpty { null }
+        } catch (e: Exception) {
+            lastError = e
+            null
+        }
+
+        if (torHttpPort > 0) {
+            val viaTor = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", torHttpPort))
+            attempt(DIRECT_BASE) { url, b -> http(context, url, b, viaTor) }?.let { return it }
+        }
         for (tunnel in Tunnel.entries) {
             // Moat от Guardian Project за dnstt не видит наш IP, ему нужна страна явно.
             if (tunnel == Tunnel.GUARDIAN_PROJECT && country == null) continue
-            try {
-                if (tunnel == Tunnel.TOR_PROJECT) {
-                    runCatching { request(context, tunnel, "builtin", null) }
-                        .onSuccess { BuiltInBridges.update(context, it) }
-                }
-                val body = JSONObject().put("transports", JSONArray(TRANSPORTS))
-                if (country != null) body.put("country", country)
-                val response = request(context, tunnel, "settings", body)
-                val bridges = extract(response)
-                if (bridges.isNotEmpty()) return bridges
-            } catch (e: Exception) {
-                lastError = e
-            }
+            attempt(tunnel.baseUrl) { url, b -> viaTunnel(context, tunnel, url, b) }?.let { return it }
         }
         lastError?.let { throw it }
         return emptyList()
@@ -81,35 +92,39 @@ object Moat {
         return result
     }
 
-    private fun request(context: Context, tunnel: Tunnel, path: String, body: JSONObject?): JSONObject {
+    private fun viaTunnel(context: Context, tunnel: Tunnel, url: String, body: JSONObject?): JSONObject {
         val port = PluggableTransports.startSingle(context, tunnel.transport)
         val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", port))
-
         // Параметры транспорта передаются через логин SOCKS5, пароль — нулевой байт.
         Authenticator.setDefault(object : Authenticator() {
             override fun getPasswordAuthentication() = PasswordAuthentication(tunnel.args, charArrayOf('\u0000'))
         })
         try {
-            val conn = URL(tunnel.baseUrl + path).openConnection(proxy) as HttpsURLConnection
-            sslFactory(context)?.let { conn.sslSocketFactory = it }
-            conn.connectTimeout = 60_000
-            conn.readTimeout = 60_000
-            conn.setRequestProperty("Content-Type", "application/vnd.api+json")
-            if (body != null) {
-                conn.requestMethod = "POST"
-                conn.doOutput = true
-                conn.outputStream.use { it.write(body.toString().toByteArray()) }
-            }
-            try {
-                if (conn.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IllegalStateException(L10n.s(R.string.log_moat_http, conn.responseCode))
-                }
-                return JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-            } finally {
-                conn.disconnect()
-            }
+            return http(context, url, body, proxy)
         } finally {
             Authenticator.setDefault(null)
+        }
+    }
+
+    private fun http(context: Context, url: String, body: JSONObject?, proxy: Proxy): JSONObject {
+        val conn = URL(url).openConnection(proxy) as HttpsURLConnection
+        sslFactory(context)?.let { conn.sslSocketFactory = it }
+        // Недолго: если путь заблокирован, лучше быстро перейти к следующему.
+        conn.connectTimeout = 20_000
+        conn.readTimeout = 30_000
+        conn.setRequestProperty("Content-Type", "application/vnd.api+json")
+        if (body != null) {
+            conn.requestMethod = "POST"
+            conn.doOutput = true
+            conn.outputStream.use { it.write(body.toString().toByteArray()) }
+        }
+        try {
+            if (conn.responseCode != HttpURLConnection.HTTP_OK) {
+                throw IllegalStateException(L10n.s(R.string.log_moat_http, conn.responseCode))
+            }
+            return JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+        } finally {
+            conn.disconnect()
         }
     }
 

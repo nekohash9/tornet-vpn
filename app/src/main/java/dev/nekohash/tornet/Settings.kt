@@ -66,11 +66,18 @@ data class RotationSettings(
         private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
         /** Способ, которым удалось подключиться в прошлый раз, — в режиме «Авто» пробуем его первым. */
-        fun lastWorking(context: Context) =
-            prefs(context).getString("last_working", null)?.let { BridgeMode.fromId(it) }
+        fun lastWorking(context: Context, network: String) =
+            (prefs(context).getString("last_working_$network", null) ?: prefs(context).getString("last_working", null))
+                ?.let { BridgeMode.fromId(it) }
 
-        fun setLastWorking(context: Context, mode: BridgeMode) =
-            prefs(context).edit().putString("last_working", mode.id).apply()
+        fun setLastWorking(context: Context, network: String, mode: BridgeMode) =
+            prefs(context).edit().putString("last_working_$network", mode.id).putString("last_working", mode.id).apply()
+
+        /** Когда Moat в последний раз не ответил — чтобы «Авто» не тратил на него время каждый раз. */
+        fun moatFailedAt(context: Context) = prefs(context).getLong("moat_failed_at", 0L)
+
+        fun setMoatFailedAt(context: Context, time: Long) =
+            prefs(context).edit().putLong("moat_failed_at", time).apply()
 
         /** Мосты, выданные Moat в прошлый раз. */
         fun moatBridges(context: Context) =

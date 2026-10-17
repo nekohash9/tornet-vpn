@@ -139,4 +139,12 @@
     <string name="log_network_lost">Сеть пропала — жду, когда появится</string>
     <string name="log_network_changed">Сеть сменилась — переподключаю Tor</string>
     <string name="log_watchdog_reconnect">У Tor нет рабочих цепочек — переподключаю</string>
+    <string name="bridges_bot">Получить мосты в Telegram (@GetBridgesBot)</string>
+    <string name="fetch_failed_hint">Не удалось связаться с Tor Project. Запустите Tor — тогда запрос пойдёт через него — или возьмите мосты в Telegram у @GetBridgesBot.</string>
+    <string name="log_moat_skipped">Moat недавно не ответил — пока пропускаю</string>
+    <string name="log_last_working">Начинаю со способа «%1$s» — он сработал в прошлый раз в сети %2$s</string>
+    <string name="log_reselect">Прежний способ не работает в этой сети — подбираю новый</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_cellular">мобильный интернет</string>
+    <string name="network_other">этой сети</string>
 </resources>

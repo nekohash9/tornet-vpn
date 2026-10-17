@@ -158,6 +158,14 @@ S = [
 ("log_network_lost","Network lost — waiting for it to come back","Сеть пропала — жду, когда появится"),
 ("log_network_changed","Network changed — reconnecting Tor","Сеть сменилась — переподключаю Tor"),
 ("log_watchdog_reconnect","Tor has no working circuits — reconnecting","У Tor нет рабочих цепочек — переподключаю"),
+("bridges_bot","Get bridges in Telegram (@GetBridgesBot)","Получить мосты в Telegram (@GetBridgesBot)"),
+("fetch_failed_hint","Could not reach Tor Project. Start Tor first (the request then goes through Tor), or get bridges from @GetBridgesBot in Telegram.","Не удалось связаться с Tor Project. Запустите Tor — тогда запрос пойдёт через него — или возьмите мосты в Telegram у @GetBridgesBot."),
+("log_moat_skipped","Moat failed recently — skipping it for now","Moat недавно не ответил — пока пропускаю"),
+("log_last_working","Starting with %1$s — it worked last time on %2$s","Начинаю со способа «%1$s» — он сработал в прошлый раз в сети %2$s"),
+("log_reselect","The previous method doesn't work on this network — picking a new one","Прежний способ не работает в этой сети — подбираю новый"),
+("network_wifi","Wi-Fi","Wi-Fi"),
+("network_cellular","mobile data","мобильный интернет"),
+("network_other","this network","этой сети"),
 ]
 def esc(v):
     v = escape(v).replace("'", "\\'")

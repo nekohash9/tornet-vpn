@@ -72,6 +72,7 @@ class TorNetService : LifecycleService() {
     private var currentNetwork: AndroidNetwork? = null
     @Volatile private var networkUp = true
     private var watchdogJob: Job? = null
+    private var reselectJob: Job? = null
     private var lanBoundIp: String? = null
 
     private val connection = object : ServiceConnection {
@@ -199,7 +200,11 @@ class TorNetService : LifecycleService() {
             // Сначала то, что сработало в прошлый раз, потом от быстрого к самому живучему.
             val order = mutableListOf<BridgeMode>()
             if (BridgeLine.parse(s.customBridges).isNotEmpty()) order += BridgeMode.CUSTOM
-            RotationSettings.lastWorking(this)?.let { order += it }
+            val network = Network.type(this)
+            RotationSettings.lastWorking(this, network)?.let {
+                order += it
+                TorNetStore.log(L10n.s(R.string.log_last_working, it.title, L10n.s(networkName(network))))
+            }
             order += listOf(
                 BridgeMode.DIRECT, BridgeMode.MOAT, BridgeMode.OBFS4, BridgeMode.SNOWFLAKE,
                 BridgeMode.DNSTT, BridgeMode.MEEK,
@@ -218,13 +223,26 @@ class TorNetService : LifecycleService() {
             null
         }
         BridgeMode.MOAT -> {
-            TorNetStore.log(L10n.s(R.string.log_moat_request))
-            val fresh = withContext(Dispatchers.IO) { runCatching { Moat.fetchBridges(this@TorNetService) } }
-            fresh.onSuccess {
-                if (it.isNotEmpty()) RotationSettings.setMoatBridges(this, it)
-                TorNetStore.log(L10n.s(R.string.log_moat_got, it.size))
-            }.onFailure { TorNetStore.log(L10n.s(R.string.log_moat_failed, it.message)) }
-            (fresh.getOrNull()?.takeIf { it.isNotEmpty() } ?: RotationSettings.moatBridges(this)).ifEmpty { null }
+            val recentlyFailed = System.currentTimeMillis() - RotationSettings.moatFailedAt(this) < MOAT_RETRY_MS
+            val fresh = if (recentlyFailed) {
+                TorNetStore.log(L10n.s(R.string.log_moat_skipped))
+                null
+            } else {
+                TorNetStore.log(L10n.s(R.string.log_moat_request))
+                val port = TorNetStore.state.value.httpPort.takeIf { TorNetStore.state.value.status == TorStatus.ON } ?: 0
+                withContext(Dispatchers.IO) { runCatching { Moat.fetchBridges(this@TorNetService, port) } }
+                    .onSuccess {
+                        if (it.isNotEmpty()) RotationSettings.setMoatBridges(this, it)
+                        RotationSettings.setMoatFailedAt(this, 0)
+                        TorNetStore.log(L10n.s(R.string.log_moat_got, it.size))
+                    }
+                    .onFailure {
+                        RotationSettings.setMoatFailedAt(this, System.currentTimeMillis())
+                        TorNetStore.log(L10n.s(R.string.log_moat_failed, it.message))
+                    }
+                    .getOrNull()
+            }
+            (fresh?.takeIf { it.isNotEmpty() } ?: RotationSettings.moatBridges(this)).ifEmpty { null }
         }
         else -> BuiltInBridges.get(this, mode).ifEmpty { null }
     }
@@ -333,10 +351,16 @@ class TorNetService : LifecycleService() {
                     TorNetStore.log(L10n.s(R.string.log_bootstrap, progress, summary))
                     lastLogged = progress
                 }
-                if (progress >= 100) onTorReady() else checkStall(progress)
+                // «100%» без готовой цепочки бывает после смены мостов на работающем Tor —
+                // считаем подключённым только по факту цепочки.
+                if (progress >= 100 && circuitEstablished()) onTorReady() else checkStall(minOf(progress, 99))
             }
             delay(1000)
         }
+    }
+
+    private suspend fun circuitEstablished(): Boolean = withContext(Dispatchers.IO) {
+        runCatching { torService?.getInfo("status/circuit-established") }.getOrNull()?.trim() == "1"
     }
 
     private fun onTorReady() {
@@ -349,7 +373,7 @@ class TorNetService : LifecycleService() {
             it.copy(status = TorStatus.ON, bootstrap = 100, socksPort = socks, httpPort = http)
         }
         TorNetStore.log(L10n.s(R.string.log_connected, currentMode.title, socks, http))
-        RotationSettings.setLastWorking(this, currentMode)
+        RotationSettings.setLastWorking(this, Network.type(this), currentMode)
         lastChangeAt = System.currentTimeMillis()
 
         syncVpn()
@@ -537,6 +561,38 @@ class TorNetService : LifecycleService() {
         delay(1500) // даём новой сети подняться
         reconnectTor()
         syncLan()
+        verifyAfterNetworkChange()
+    }
+
+    /**
+     * В новой сети прежний способ может быть заблокирован (например, без мостов работало
+     * на Wi-Fi, а мобильный оператор Tor режет). Если цепочек нет — «Авто» подбирает заново.
+     */
+    private fun verifyAfterNetworkChange() {
+        reselectJob?.cancel()
+        reselectJob = lifecycleScope.launch {
+            delay(RESELECT_AFTER_MS)
+            if (TorNetStore.state.value.status != TorStatus.ON || !networkUp) return@launch
+            val established = withContext(Dispatchers.IO) {
+                runCatching { torService?.getInfo("status/circuit-established") }.getOrNull()
+            }?.trim()
+            if (established != "0" || settings.bridgeMode != BridgeMode.AUTO) return@launch
+            TorNetStore.log(L10n.s(R.string.log_reselect))
+            rotationJob?.cancel()
+            TorNetStore.update { it.copy(status = TorStatus.STARTING, nextChangeAt = 0) }
+            bootstrapJob?.cancel()
+            bootstrapJob = lifecycleScope.launch {
+                resetAttempts()
+                nextAttempt(firstStart = false)
+                watchBootstrap()
+            }
+        }
+    }
+
+    private fun networkName(type: String) = when (type) {
+        "wifi" -> R.string.network_wifi
+        "cellular" -> R.string.network_cellular
+        else -> R.string.network_other
     }
 
     /** Заставляет Tor бросить старые соединения и подключиться заново (без перезапуска). */
@@ -580,6 +636,7 @@ class TorNetService : LifecycleService() {
 
     private fun stopWatchingNetwork() {
         watchdogJob?.cancel()
+        reselectJob?.cancel()
         networkCallback?.let { cb ->
             runCatching { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) }
         }
@@ -703,6 +760,8 @@ class TorNetService : LifecycleService() {
         const val ACTION_SYNC_VPN = "dev.nekohash.tornet.SYNC_VPN"
 
         private const val WATCHDOG_MS = 60_000L
+        private const val RESELECT_AFTER_MS = 45_000L
+        private const val MOAT_RETRY_MS = 30 * 60_000L
 
         /** К раздаваемому прокси пускаем только локальные сети и сам телефон. */
         private const val LAN_POLICY =

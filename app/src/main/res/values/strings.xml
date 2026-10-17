@@ -149,4 +149,12 @@
     <string name="log_network_lost">Network lost — waiting for it to come back</string>
     <string name="log_network_changed">Network changed — reconnecting Tor</string>
     <string name="log_watchdog_reconnect">Tor has no working circuits — reconnecting</string>
+    <string name="bridges_bot">Get bridges in Telegram (@GetBridgesBot)</string>
+    <string name="fetch_failed_hint">Could not reach Tor Project. Start Tor first (the request then goes through Tor), or get bridges from @GetBridgesBot in Telegram.</string>
+    <string name="log_moat_skipped">Moat failed recently — skipping it for now</string>
+    <string name="log_last_working">Starting with %1$s — it worked last time on %2$s</string>
+    <string name="log_reselect">The previous method doesn\'t work on this network — picking a new one</string>
+    <string name="network_wifi">Wi-Fi</string>
+    <string name="network_cellular">mobile data</string>
+    <string name="network_other">this network</string>
 </resources>
