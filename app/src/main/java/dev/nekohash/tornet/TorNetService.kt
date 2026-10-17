@@ -11,6 +11,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network as AndroidNetwork
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -65,6 +67,13 @@ class TorNetService : LifecycleService() {
     private var appliedBridges: Pair<BridgeMode, String>? = null
     private var appliedExit: String? = null
 
+    // Слежение за сетью: смена Wi-Fi ↔ LTE, потеря интернета, выход из сна.
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var currentNetwork: AndroidNetwork? = null
+    @Volatile private var networkUp = true
+    private var watchdogJob: Job? = null
+    private var lanBoundIp: String? = null
+
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             torService = (binder as? TorService.LocalBinder)?.service
@@ -96,13 +105,25 @@ class TorNetService : LifecycleService() {
                 settings = RotationSettings.load(this).normalized()
                 lifecycleScope.launch { syncLan() }
             }
+            ACTION_SYNC_VPN -> {
+                settings = RotationSettings.load(this).normalized()
+                syncVpn()
+            }
             ACTION_STOP -> stop()
+            // Система перезапустила сервис после сбоя или нехватки памяти — продолжаем, если Tor был включён.
+            null -> if (wasRunning(this)) {
+                // На новых Android запуск фоновой службы могут запретить — тогда просто ждём пользователя.
+                runCatching { start() }.onFailure { stopSelf() }
+            } else {
+                stopSelf()
+            }
             else -> stopSelf()
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun start() {
+        setRunning(this, true)
         settings = RotationSettings.load(this).normalized()
         createChannel()
         ServiceCompat.startForeground(
@@ -163,6 +184,7 @@ class TorNetService : LifecycleService() {
                 return@launch
             }
             bootstrapJob = lifecycleScope.launch { watchBootstrap() }
+            watchNetwork()
         }
     }
 
@@ -270,6 +292,11 @@ class TorNetService : LifecycleService() {
     private suspend fun checkStall(progress: Int) {
         if (progress >= 100 || switching) return
         val now = System.currentTimeMillis()
+        if (!networkUp) {
+            // Без интернета застревание ничего не говорит о способе подключения — не перебираем зря.
+            stallSince = now
+            return
+        }
         if (progress > stallBaseline) {
             stallBaseline = progress
             stallSince = now
@@ -326,6 +353,7 @@ class TorNetService : LifecycleService() {
         lastChangeAt = System.currentTimeMillis()
 
         syncVpn()
+        startWatchdog()
         lifecycleScope.launch {
             syncLan()
             refreshIp()
@@ -335,6 +363,10 @@ class TorNetService : LifecycleService() {
 
     private fun startRotation() {
         rotationJob?.cancel()
+        if (!settings.rotate) {
+            TorNetStore.update { it.copy(nextChangeAt = 0) }
+            return
+        }
         rotationJob = lifecycleScope.launch {
             while (isActive) {
                 val s = settings
@@ -441,31 +473,123 @@ class TorNetService : LifecycleService() {
     }
 
     /**
-     * Раздача прокси в локальной сети: добавляем Tor второй SOCKS-порт на 0.0.0.0.
-     * Основной порт остаётся только на 127.0.0.1.
+     * Раздача прокси в локальной сети. Второй SOCKS-порт открывается только на адресе
+     * Wi-Fi или точки доступа (не на мобильном интернете), а SocksPolicy пускает лишь
+     * локальные адреса — посторонние из интернета подключиться не смогут.
      */
     private suspend fun syncLan() {
         val state = TorNetStore.state.value
         if (state.status != TorStatus.ON) return
-        val want = settings.shareLan
-        if (want == (state.lanPort > 0)) return
+        val ip = if (settings.shareLan) Network.lanIpv4() else null
+        if (settings.shareLan && ip == null && state.lanPort == 0 && lanBoundIp == null) {
+            TorNetStore.log(L10n.s(R.string.log_lan_no_network))
+        }
+        if (ip == lanBoundIp && (ip != null) == (state.lanPort > 0)) return
         val control = torService?.torControlConnection ?: return
-        val ports = mutableListOf("SocksPort 127.0.0.1:${state.socksPort}")
-        if (want) ports += "SocksPort 0.0.0.0:$LAN_SOCKS_PORT"
+        val config = mutableListOf("SocksPort 127.0.0.1:${state.socksPort}")
+        if (ip != null) config += "SocksPort $ip:$LAN_SOCKS_PORT"
+        config += "SocksPolicy $LAN_POLICY"
         val ok = withContext(Dispatchers.IO) {
-            runCatching { control.setConf(ports) }
+            runCatching { control.setConf(config) }
                 .onFailure { TorNetStore.log(L10n.s(R.string.log_lan_failed, it.message)) }
                 .isSuccess
         }
         if (!ok) return
-        TorNetStore.update { it.copy(lanPort = if (want) LAN_SOCKS_PORT else 0) }
+        lanBoundIp = ip
+        TorNetStore.update { it.copy(lanPort = if (ip != null) LAN_SOCKS_PORT else 0) }
         TorNetStore.log(
-            if (want) L10n.s(R.string.log_lan_on, LAN_SOCKS_PORT)
+            if (ip != null) L10n.s(R.string.log_lan_on_ip, ip, LAN_SOCKS_PORT)
             else L10n.s(R.string.log_lan_off)
         )
     }
 
+    // --- Сеть: переключение Wi-Fi ↔ LTE, потеря связи, сон ---
+
+    private fun watchNetwork() {
+        if (networkCallback != null) return
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: AndroidNetwork) {
+                lifecycleScope.launch { onNetworkAvailable(network) }
+            }
+
+            override fun onLost(network: AndroidNetwork) {
+                lifecycleScope.launch {
+                    if (network != currentNetwork) return@launch
+                    networkUp = false
+                    TorNetStore.log(L10n.s(R.string.log_network_lost))
+                    syncLan()
+                }
+            }
+        }
+        // TorNet исключён из своего VPN, поэтому здесь видна настоящая сеть (Wi-Fi или мобильная).
+        runCatching { cm.registerDefaultNetworkCallback(callback) }.onSuccess { networkCallback = callback }
+    }
+
+    private suspend fun onNetworkAvailable(network: AndroidNetwork) {
+        val previous = currentNetwork
+        val wasDown = !networkUp
+        currentNetwork = network
+        networkUp = true
+        // Первый вызов приходит сразу после регистрации — это не смена сети.
+        if (previous == null || (previous == network && !wasDown)) return
+        TorNetStore.log(L10n.s(R.string.log_network_changed))
+        delay(1500) // даём новой сети подняться
+        reconnectTor()
+        syncLan()
+    }
+
+    /** Заставляет Tor бросить старые соединения и подключиться заново (без перезапуска). */
+    private suspend fun reconnectTor() {
+        val control = torService?.torControlConnection ?: return
+        withContext(Dispatchers.IO) {
+            runCatching {
+                control.setConf("DisableNetwork", "1")
+                control.setConf("DisableNetwork", "0")
+            }
+        }
+        stallSince = System.currentTimeMillis()
+    }
+
+    /**
+     * Сторож: после сна или долгой потери связи Tor иногда «застывает» без цепочек.
+     * Раз в минуту проверяем, и если цепочек нет два раза подряд — переподключаемся.
+     */
+    private fun startWatchdog() {
+        watchdogJob?.cancel()
+        watchdogJob = lifecycleScope.launch {
+            var misses = 0
+            while (isActive) {
+                delay(WATCHDOG_MS)
+                if (TorNetStore.state.value.status != TorStatus.ON || !networkUp) {
+                    misses = 0
+                    continue
+                }
+                val established = withContext(Dispatchers.IO) {
+                    runCatching { torService?.getInfo("status/circuit-established") }.getOrNull()
+                }?.trim()
+                misses = if (established == "0") misses + 1 else 0
+                if (misses >= 2) {
+                    misses = 0
+                    TorNetStore.log(L10n.s(R.string.log_watchdog_reconnect))
+                    reconnectTor()
+                }
+            }
+        }
+    }
+
+    private fun stopWatchingNetwork() {
+        watchdogJob?.cancel()
+        networkCallback?.let { cb ->
+            runCatching { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) }
+        }
+        networkCallback = null
+        currentNetwork = null
+        networkUp = true
+    }
+
     private fun stop() {
+        setRunning(this, false)
         if (TorNetStore.state.value.vpnActive) TorVpnService.stop(this)
         bootstrapJob?.cancel()
         rotationJob?.cancel()
@@ -481,6 +605,8 @@ class TorNetService : LifecycleService() {
     }
 
     private fun releaseTor() {
+        stopWatchingNetwork()
+        lanBoundIp = null
         PluggableTransports.stopAll()
         appliedBridges = null
         appliedExit = null
@@ -574,6 +700,21 @@ class TorNetService : LifecycleService() {
         const val ACTION_STOP = "dev.nekohash.tornet.STOP"
         const val ACTION_NEW_IP = "dev.nekohash.tornet.NEW_IP"
         const val ACTION_SYNC_LAN = "dev.nekohash.tornet.SYNC_LAN"
+        const val ACTION_SYNC_VPN = "dev.nekohash.tornet.SYNC_VPN"
+
+        private const val WATCHDOG_MS = 60_000L
+
+        /** К раздаваемому прокси пускаем только локальные сети и сам телефон. */
+        private const val LAN_POLICY =
+            "accept 127.0.0.0/8,accept 10.0.0.0/8,accept 172.16.0.0/12,accept 192.168.0.0/16,reject *"
+
+        private fun prefs(context: Context) = context.getSharedPreferences("tornet", Context.MODE_PRIVATE)
+
+        /** Был ли Tor включён пользователем — чтобы восстановиться после сбоя процесса. */
+        fun wasRunning(context: Context) = prefs(context).getBoolean("running", false)
+
+        private fun setRunning(context: Context, value: Boolean) =
+            prefs(context).edit().putBoolean("running", value).apply()
 
         /** Порт, как у Tor Browser, — его знают многие клиенты. */
         const val LAN_SOCKS_PORT = 9150

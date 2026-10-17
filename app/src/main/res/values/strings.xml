@@ -54,7 +54,7 @@
     <string name="lan_address" translatable="false">SOCKS5  %1$s:%2$d</string>
     <string name="lan_no_network">SOCKS5  port %1$d — no Wi-Fi or hotspot</string>
     <string name="lan_send_link">Send a link for Telegram</string>
-    <string name="lan_help">To route a computer or another phone on the same network (or on your hotspot) through Tor: open the t.me/socks link on it or set the proxy manually. The proxy has no password — only turn this on in your own network.</string>
+    <string name="lan_help">To route a computer or another phone on the same Wi-Fi (or on your hotspot) through Tor, open the t.me/socks link on it or set the proxy manually. The proxy opens only on Wi-Fi or hotspot and only for local addresses, but it has no password — use it only on your own network.</string>
     <string name="log">Log</string>
     <string name="language_title">Language</string>
     <string name="language_system">System</string>
@@ -117,7 +117,7 @@
     <string name="vpn_log_no_permission">VPN: no permission, turn VPN mode on from the app</string>
     <string name="vpn_log_iface_failed">VPN: could not create the interface: %1$s</string>
     <string name="vpn_log_tun2socks_failed">VPN: tun2socks did not start: %1$s</string>
-    <string name="vpn_log_on">VPN on: all phone traffic goes through Tor</string>
+    <string name="vpn_log_on">VPN on: %1$s go through Tor</string>
     <string name="vpn_log_off">VPN off</string>
     <string name="vpn_log_revoked">VPN was turned off by the system</string>
     <string name="exit_title">Exit country (priority region)</string>
@@ -127,4 +127,26 @@
     <string name="log_exit_set">Exit countries: %1$s</string>
     <string name="log_exit_any">Exit country: any</string>
     <string name="log_exit_no_geoip">No GeoIP database in this build — exit country selection is unavailable</string>
+    <string name="rotate_auto">Change IP automatically</string>
+    <string name="apps_title">Apps through Tor</string>
+    <string name="apps_mode_all">All apps</string>
+    <string name="apps_mode_only">Only selected apps</string>
+    <string name="apps_mode_except">All apps except selected</string>
+    <string name="apps_search">Search apps</string>
+    <string name="apps_hint_all">All apps go through Tor. Choose a mode above to pick apps.</string>
+    <string name="apps_hint_only_empty">Nothing selected yet — until you pick apps, all apps go through Tor.</string>
+    <string name="apps_hint_only">Only %1$d selected apps go through Tor. All other apps use your regular connection: your provider sees their traffic and sites see your real IP.</string>
+    <string name="apps_hint_except">%1$d selected apps bypass Tor and use your regular connection: your provider sees their traffic and sites see your real IP. Handy for banks and services that block Tor (ChatGPT, Gemini…).</string>
+    <string name="apps_summary_all">all apps</string>
+    <string name="apps_summary_only">only %1$d selected</string>
+    <string name="apps_summary_except">all except %1$d</string>
+    <string name="apps_button">Apps through VPN: %1$s</string>
+    <string name="vpn_lockdown_help">So traffic never goes around Tor if TorNet stops or crashes, turn on “Always-on VPN” and “Block connections without VPN” for TorNet in Android settings. Apps excluded from Tor will then have no internet.</string>
+    <string name="vpn_system_settings">Open Android VPN settings</string>
+    <string name="vpn_log_rules_updated">VPN rules updated: %1$s go through Tor</string>
+    <string name="log_lan_on_ip">Proxy open on the local network: SOCKS5 %1$s:%2$d (local addresses only)</string>
+    <string name="log_lan_no_network">Proxy sharing is on, but there is no Wi-Fi or hotspot — not opening it</string>
+    <string name="log_network_lost">Network lost — waiting for it to come back</string>
+    <string name="log_network_changed">Network changed — reconnecting Tor</string>
+    <string name="log_watchdog_reconnect">Tor has no working circuits — reconnecting</string>
 </resources>

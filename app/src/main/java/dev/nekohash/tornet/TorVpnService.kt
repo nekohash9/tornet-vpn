@@ -21,6 +21,8 @@ import java.io.File
 class TorVpnService : VpnService() {
 
     private var tun: ParcelFileDescriptor? = null
+    private var appliedSignature: String? = null
+    private var socksPort = 0
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -36,20 +38,57 @@ class TorVpnService : VpnService() {
                 TorNetService.start(this)
             }
         }
+        // Если система перезапустит сервис, TorNetService заново поднимет VPN, когда Tor подключится.
         return START_NOT_STICKY
     }
 
-    private fun startVpn(socksPort: Int) {
-        if (tun != null) return
-        if (socksPort <= 0) {
+    /**
+     * Поднимает VPN или, если он уже работает, пересоздаёт интерфейс под новые правила
+     * приложений. Новый интерфейс устанавливается до закрытия старого, так что трафик
+     * в обход туннеля в этот момент не уходит.
+     */
+    private fun startVpn(port: Int) {
+        if (port <= 0) {
             TorNetStore.log(L10n.s(R.string.vpn_log_no_port))
             return
         }
+        val rules = AppRules.load(this)
+        if (tun != null && rules.signature == appliedSignature && port == socksPort) return
         if (prepare(this) != null) {
             TorNetStore.log(L10n.s(R.string.vpn_log_no_permission))
             return
         }
 
+        val fd = buildInterface(rules) ?: return
+        val old = tun
+        if (old != null) runCatching { TProxyService.TProxyStopService() }
+
+        val config = File(filesDir, "tunnel.yml").apply { writeText(tunnelConfig(port)) }
+        val started = runCatching { TProxyService.TProxyStartService(config.absolutePath, fd.fd) }
+            .onFailure { TorNetStore.log(L10n.s(R.string.vpn_log_tun2socks_failed, it.message)) }
+            .getOrDefault(false)
+        if (!started) {
+            fd.close()
+            if (old != null) {
+                runCatching { old.close() }
+                tun = null
+                appliedSignature = null
+                TorNetStore.update { it.copy(vpnActive = false) }
+            }
+            return
+        }
+        runCatching { old?.close() }
+        tun = fd
+        appliedSignature = rules.signature
+        socksPort = port
+        TorNetStore.update { it.copy(vpnActive = true) }
+        TorNetStore.log(
+            if (old == null) L10n.s(R.string.vpn_log_on, AppsActivity.summary(rules))
+            else L10n.s(R.string.vpn_log_rules_updated, AppsActivity.summary(rules))
+        )
+    }
+
+    private fun buildInterface(rules: AppRules): ParcelFileDescriptor? {
         val builder = Builder()
             .setSession(getString(R.string.app_name))
             .setMtu(MTU)
@@ -64,31 +103,41 @@ class TorVpnService : VpnService() {
                 ),
             )
         if (Build.VERSION.SDK_INT >= 29) builder.setMetered(false)
-        try {
-            // Сам Tor работает в нашем процессе и должен ходить в сеть напрямую,
-            // иначе его трафик зациклится в собственный туннель.
-            builder.addDisallowedApplication(packageName)
-        } catch (_: PackageManager.NameNotFoundException) {
-        }
-
-        val fd = try {
+        applyRules(builder, rules)
+        return try {
             builder.establish()
         } catch (e: Exception) {
             TorNetStore.log(L10n.s(R.string.vpn_log_iface_failed, e.message))
             null
-        } ?: return
-
-        val config = File(filesDir, "tunnel.yml").apply { writeText(tunnelConfig(socksPort)) }
-        val started = runCatching { TProxyService.TProxyStartService(config.absolutePath, fd.fd) }
-            .onFailure { TorNetStore.log(L10n.s(R.string.vpn_log_tun2socks_failed, it.message)) }
-            .getOrDefault(false)
-        if (!started) {
-            fd.close()
-            return
         }
-        tun = fd
-        TorNetStore.update { it.copy(vpnActive = true) }
-        TorNetStore.log(L10n.s(R.string.vpn_log_on))
+    }
+
+    /**
+     * Android не разрешает смешивать списки «разрешённых» и «исключённых» приложений.
+     * Сам TorNet (в нём работает Tor) всегда должен ходить в сеть мимо туннеля, иначе
+     * трафик Tor зациклится: в режимах «все» и «кроме» он исключается явно, а в режиме
+     * «только выбранные» его просто нет в списке.
+     */
+    private fun applyRules(builder: Builder, rules: AppRules) {
+        fun safely(block: () -> Unit) = try {
+            block(); true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false // приложение удалено — пропускаем
+        }
+
+        when (rules.effectiveMode) {
+            AppsMode.ALL -> safely { builder.addDisallowedApplication(packageName) }
+            AppsMode.EXCEPT -> {
+                safely { builder.addDisallowedApplication(packageName) }
+                rules.packages.filter { it != packageName }.forEach { safely { builder.addDisallowedApplication(it) } }
+            }
+            AppsMode.ONLY -> {
+                val added = rules.packages.filter { it != packageName }
+                    .count { safely { builder.addAllowedApplication(it) } }
+                // Все выбранные приложения удалены — безопаснее пустить через Tor всё.
+                if (added == 0) safely { builder.addDisallowedApplication(packageName) }
+            }
+        }
     }
 
     private fun stopVpn() {
@@ -96,6 +145,7 @@ class TorVpnService : VpnService() {
         runCatching { TProxyService.TProxyStopService() }
         runCatching { fd.close() }
         tun = null
+        appliedSignature = null
         TorNetStore.update { it.copy(vpnActive = false) }
         TorNetStore.log(L10n.s(R.string.vpn_log_off))
     }

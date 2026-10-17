@@ -16,12 +16,17 @@ no Orbot, no root.
 
 ## Features
 
-- **IP rotation on a timer** — fixed or random interval ("from–to"), a set number of times or
-  forever. A "New IP" button in the app and in the notification.
+- **IP change** — a "New IP" button in the app and in the notification. Optionally on a timer:
+  fixed or random interval, a set number of times or forever (off by default: frequent changes
+  break sessions and trigger captchas).
 - **Priority region** — exit IP only from the countries you pick (e.g. Germany and the Netherlands).
   The current exit country and flag are shown next to the IP.
 - **VPN mode** — all phone traffic goes through Tor, DNS included. No per-app proxy setup.
   Android's "Always-on VPN" is supported.
+- **Choose apps (split tunneling)** — all apps through Tor, only selected ones, or all except
+  selected. Handy for excluding banks and services that block Tor (ChatGPT, Gemini…).
+- **Resilience** — reconnects after switching Wi-Fi ↔ mobile data and after sleep, recovers after
+  a crash, works with Android "Always-on VPN" and "Block connections without VPN".
 - **Bridges against blocking** — if connecting gets stuck at 5–10%:
   - **Auto** tries methods one after another until one works, and remembers the working one;
   - obfs4, Snowflake, dnstt (over DNS-over-HTTPS), meek, or your own bridges;
@@ -29,7 +34,8 @@ no Orbot, no root.
     website is blocked.
 - **Telegram in one tap** — opens Telegram with the proxy already filled in.
 - **Share the proxy over Wi-Fi and hotspot** — a computer or another phone on the same network can
-  use this phone's Tor (a `t.me/socks` link for Telegram Desktop).
+  use this phone's Tor (a `t.me/socks` link for Telegram Desktop). The proxy opens only on
+  Wi-Fi/hotspot and only for local addresses.
 - **Local proxies** SOCKS5 `127.0.0.1:9050` and HTTP `127.0.0.1:8118` for any app.
 - Event log: connection progress, every IP change, errors.
 - English and Russian interface with an in-app language switch (Android 13+ also lets you pick it in

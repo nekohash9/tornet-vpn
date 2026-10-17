@@ -68,6 +68,16 @@ class MainActivity : AppCompatActivity() {
         binding.maxIntervalInput.setText(saved.maxInterval.toString())
         binding.countInput.setText(saved.count.toString())
         binding.vpnSwitch.isChecked = saved.vpn
+        binding.rotateSwitch.isChecked = saved.rotate
+        renderRotationInputs()
+        binding.rotateSwitch.setOnCheckedChangeListener { _, _ ->
+            renderRotationInputs()
+            binding.applyButton.isEnabled = true
+        }
+        binding.appsButton.setOnClickListener { startActivity(Intent(this, AppsActivity::class.java)) }
+        binding.vpnSettingsButton.setOnClickListener {
+            runCatching { startActivity(Intent(android.provider.Settings.ACTION_VPN_SETTINGS)) }
+        }
         exitCountries = ExitCountries.parse(saved.exitCountries)
         renderExitButton()
         binding.exitButton.setOnClickListener { pickExitCountries() }
@@ -194,9 +204,21 @@ class MainActivity : AppCompatActivity() {
         TorNetService.start(this)
     }
 
+    override fun onResume() {
+        super.onResume()
+        binding.appsButton.text = getString(R.string.apps_button, AppsActivity.summary(AppRules.load(this)))
+    }
+
+    /** Поля интервала и количества имеют смысл только при включённой автосмене. */
+    private fun renderRotationInputs() {
+        val on = binding.rotateSwitch.isChecked
+        listOf(binding.minIntervalInput, binding.maxIntervalInput, binding.countInput).forEach { it.isEnabled = on }
+    }
+
     private fun saveSettings() {
         fun read(text: CharSequence?, default: Int) = text?.toString()?.toIntOrNull() ?: default
         val s = RotationSettings(
+            binding.rotateSwitch.isChecked,
             read(binding.minIntervalInput.text, 60),
             read(binding.maxIntervalInput.text, 60),
             read(binding.countInput.text, 0),

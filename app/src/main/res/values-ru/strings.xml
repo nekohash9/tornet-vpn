@@ -49,7 +49,7 @@
     <string name="lan_share">Раздавать прокси в Wi-Fi и точке доступа</string>
     <string name="lan_no_network">SOCKS5  порт %1$d — нет Wi-Fi или точки доступа</string>
     <string name="lan_send_link">Отправить ссылку для Telegram</string>
-    <string name="lan_help">Чтобы компьютер или другой телефон в той же сети (или подключённый к вашей точке доступа) ходил через Tor: откройте на нём ссылку t.me/socks или укажите прокси вручную. Прокси без пароля — включайте только в своей сети.</string>
+    <string name="lan_help">Чтобы компьютер или другой телефон в той же Wi-Fi-сети (или подключённый к вашей точке доступа) ходил через Tor, откройте на нём ссылку t.me/socks или укажите прокси вручную. Прокси открывается только в Wi-Fi или точке доступа и только для локальных адресов, но пароля у него нет — включайте только в своей сети.</string>
     <string name="log">Журнал</string>
     <string name="language_title">Язык</string>
     <string name="language_system">Системный</string>
@@ -107,7 +107,7 @@
     <string name="vpn_log_no_permission">VPN: нет разрешения, включите режим VPN из приложения</string>
     <string name="vpn_log_iface_failed">VPN: не удалось создать интерфейс: %1$s</string>
     <string name="vpn_log_tun2socks_failed">VPN: tun2socks не запустился: %1$s</string>
-    <string name="vpn_log_on">VPN включён: весь трафик телефона идёт через Tor</string>
+    <string name="vpn_log_on">VPN включён: через Tor идут %1$s</string>
     <string name="vpn_log_off">VPN выключен</string>
     <string name="vpn_log_revoked">VPN отключён системой</string>
     <string name="exit_title">Страна выхода (приоритетный регион)</string>
@@ -117,4 +117,26 @@
     <string name="log_exit_set">Страны выхода: %1$s</string>
     <string name="log_exit_any">Страна выхода: любая</string>
     <string name="log_exit_no_geoip">В этой сборке нет базы GeoIP — выбор страны выхода недоступен</string>
+    <string name="rotate_auto">Менять IP автоматически</string>
+    <string name="apps_title">Приложения через Tor</string>
+    <string name="apps_mode_all">Все приложения</string>
+    <string name="apps_mode_only">Только выбранные</string>
+    <string name="apps_mode_except">Все, кроме выбранных</string>
+    <string name="apps_search">Поиск приложений</string>
+    <string name="apps_hint_all">Через Tor идут все приложения. Чтобы выбрать приложения, переключите режим выше.</string>
+    <string name="apps_hint_only_empty">Пока ничего не выбрано — до тех пор через Tor идут все приложения.</string>
+    <string name="apps_hint_only">Через Tor идут только выбранные (%1$d). Остальные приложения используют обычное подключение: провайдер видит их трафик, а сайты — ваш настоящий IP.</string>
+    <string name="apps_hint_except">Выбранные (%1$d) идут мимо Tor, через обычное подключение: провайдер видит их трафик, а сайты — ваш настоящий IP. Удобно для банков и сервисов, которые блокируют Tor (ChatGPT, Gemini…).</string>
+    <string name="apps_summary_all">все приложения</string>
+    <string name="apps_summary_only">только выбранные: %1$d</string>
+    <string name="apps_summary_except">все, кроме %1$d</string>
+    <string name="apps_button">Приложения через VPN: %1$s</string>
+    <string name="vpn_lockdown_help">Чтобы трафик не шёл в обход Tor, если TorNet остановится или упадёт, включите для TorNet «Постоянная VPN» и «Блокировать подключения без VPN» в настройках Android. Исключённые из Tor приложения тогда останутся без интернета.</string>
+    <string name="vpn_system_settings">Открыть настройки VPN Android</string>
+    <string name="vpn_log_rules_updated">Правила VPN обновлены: через Tor идут %1$s</string>
+    <string name="log_lan_on_ip">Прокси открыт в локальной сети: SOCKS5 %1$s:%2$d (только для локальных адресов)</string>
+    <string name="log_lan_no_network">Раздача включена, но нет Wi-Fi или точки доступа — прокси не открываю</string>
+    <string name="log_network_lost">Сеть пропала — жду, когда появится</string>
+    <string name="log_network_changed">Сеть сменилась — переподключаю Tor</string>
+    <string name="log_watchdog_reconnect">У Tor нет рабочих цепочек — переподключаю</string>
 </resources>

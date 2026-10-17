@@ -4,6 +4,8 @@ import android.content.Context
 
 /** Параметры смены IP — аналог `--interval` и `--count` из tornet. */
 data class RotationSettings(
+    /** Автоматическая смена IP. По умолчанию выключена: частая смена рвёт сессии и чаще вызывает капчи. */
+    val rotate: Boolean = false,
     val minInterval: Int = 60,
     val maxInterval: Int = 60,
     val count: Int = 0,
@@ -35,6 +37,7 @@ data class RotationSettings(
         fun load(context: Context): RotationSettings {
             val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             return RotationSettings(
+                p.getBoolean("rotate", false),
                 p.getInt("min_interval", 60),
                 p.getInt("max_interval", 60),
                 p.getInt("count", 0),
@@ -48,6 +51,7 @@ data class RotationSettings(
 
         fun save(context: Context, s: RotationSettings) {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putBoolean("rotate", s.rotate)
                 .putInt("min_interval", s.minInterval)
                 .putInt("max_interval", s.maxInterval)
                 .putInt("count", s.count)
@@ -74,5 +78,45 @@ data class RotationSettings(
 
         fun setMoatBridges(context: Context, bridges: List<BridgeLine>) =
             prefs(context).edit().putString("moat_bridges", bridges.joinToString("\n") { it.raw }).apply()
+    }
+}
+
+/** Какие приложения идут через VPN. */
+enum class AppsMode(val id: String) {
+    /** Все, кроме самого TorNet. */
+    ALL("all"),
+    ONLY("only"),
+    EXCEPT("except");
+
+    companion object {
+        fun fromId(id: String?) = entries.firstOrNull { it.id == id } ?: ALL
+    }
+}
+
+/** Раздельное туннелирование: режим и выбранные пакеты. */
+data class AppRules(val mode: AppsMode = AppsMode.ALL, val packages: Set<String> = emptySet()) {
+    /** «Только выбранные» без выбранных приложений равносилен «Всем» — так безопаснее, чем пустой VPN. */
+    val effectiveMode: AppsMode get() = if (mode == AppsMode.ONLY && packages.isEmpty()) AppsMode.ALL else mode
+
+    /** Меняется при любом изменении правил — по нему VPN понимает, что интерфейс надо пересоздать. */
+    val signature: String get() = effectiveMode.id + ":" + packages.sorted().joinToString(",")
+
+    companion object {
+        private const val PREFS = "tornet"
+
+        fun load(context: Context): AppRules {
+            val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            return AppRules(
+                AppsMode.fromId(p.getString("apps_mode", null)),
+                p.getStringSet("apps", emptySet()).orEmpty().toSet(),
+            )
+        }
+
+        fun save(context: Context, rules: AppRules) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString("apps_mode", rules.mode.id)
+                .putStringSet("apps", rules.packages)
+                .apply()
+        }
     }
 }
